@@ -1,0 +1,53 @@
+query getAllClasses {
+  allCourses {
+    _id
+    id
+    name
+    courseCode
+  }
+}
+
+query getClass($classId: ID!) {
+  course(id: $classId) {
+    _id
+    courseCode
+    id
+    assetString
+    createdAt
+    syllabusBody
+    name
+    assignmentsConnection {
+      nodes {
+        _id
+        id
+        htmlUrl
+        description
+        dueAt
+      }
+    }
+  }
+}
+
+query getClassAssignments($classId: ID!) {
+  course(id: $classId) {
+    assignmentsConnection {
+      nodes {
+        _id
+        id
+        htmlUrl
+        dueAt
+        state
+        name
+        submissionsConnection {
+          nodes {
+            attempt
+            readState
+            score
+            gradingStatus
+          }
+        }
+        pointsPossible
+      }
+    }
+  }
+}

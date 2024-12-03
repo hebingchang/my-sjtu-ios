@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>ChillRoundGothic_Bold.otf</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>UnicodeAction</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>qrcode</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>思源码</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>打开思源码</string>
+		</dict>
+	</array>
+</dict>
+</plist>

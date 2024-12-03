@@ -1,0 +1,30 @@
+{
+  "schemaNamespace" : "CanvasSchema",
+  "input" : {
+    "operationSearchPaths" : [
+      "**/*.graphql"
+    ],
+    "schemaSearchPaths" : [
+      "**/*.graphqls",
+      "**/schema.json"
+    ]
+  },
+  "output" : {
+    "testMocks" : {
+      "none" : {
+      }
+    },
+    "schemaTypes" : {
+      "path" : "./MySJTU/GraphQL/Canvas",
+      "moduleType" : {
+        "embeddedInTarget" : {
+          "name" : "MySJTU"
+        }
+      }
+    },
+    "operations" : {
+      "inSchemaModule" : {
+      }
+    }
+  }
+}
