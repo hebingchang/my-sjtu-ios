@@ -106,6 +106,7 @@ struct JAccountAuthProvider: WebAuthProvider {
     var features: [FeatureRequirement] = [
         FeatureRequirement(feature: .schedule, required: true),
         FeatureRequirement(feature: .unicode, required: false),
+        FeatureRequirement(feature: .campus_card, required: false),
         FeatureRequirement(feature: .canvas, required: false)
     ]
 
@@ -151,7 +152,12 @@ struct JAccountAuthProvider: WebAuthProvider {
             ],
             encoding: URLEncoding(destination: .queryString)
         ).serializingDecodable(OpenApiResponse<Profile>.self).value
-        return profileResponse.entities[0]
+        
+        if let entities = profileResponse.entities, entities.count > 0 {
+            return entities[0]
+        } else {
+            throw APIError.remoteError("服务器未返回用户信息")
+        }
     }
 
     func authenticate(code: String?, cookies: [HTTPCookie], config: OAuthConfig?) async throws -> WebAuthAccount {
@@ -191,7 +197,7 @@ struct JAccountAuthProvider: WebAuthProvider {
                 status: .connected,
                 tokens: [
                     TokenForScopes(scopes: ["lessons"], accessToken: lessonToken),
-                    TokenForScopes(scopes: config.scopes, accessToken: token),
+                    TokenForScopes(scopes: ["unicode", "card", "privacy"], accessToken: token),
                 ],
                 cookies: cookies.map { cookie in
                     Cookie(cookie)

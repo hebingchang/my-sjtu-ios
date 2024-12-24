@@ -31,7 +31,8 @@ struct SignInView: View {
         .padding()
         .task {
             do {
-                authConfig = try await provider.get().getConfig(scopes: ["unicode", "card_info", "privacy"])
+                // authConfig = try await provider.get().getConfig(scopes: ["unicode", "card_info", "card_transactions", "write_card_info", "privacy"])
+                authConfig = try await provider.get().getConfig(scopes: [])
                 stage = .waitingForWebView
                 showWebView = true
             } catch {
@@ -60,15 +61,16 @@ struct SignInView: View {
             }
         ) {
             BrowserView(
-                url: URL(string: authConfig!.authorization_url)!,
+                urlRequest: URLRequest(url: URL(string: authConfig!.authorization_url)!),
                 redirectUrl: URL(string: authConfig!.redirect_url)!,
                 cookiesDomains: provider.get().cookiesDomains,
-                onRedirect: { (cookies, code) in
+                onRedirect: { (_, cookies, code) in
                     self.code = code
                     self.cookies = cookies
                     stage = .exchangeToken
                     showWebView = false
-                }
+                },
+                onlyCheckRedirectHost: false
             )
         }
     }

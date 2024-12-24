@@ -19,6 +19,19 @@ struct WidgetSchedule: Hashable {
     let color: String?
 }
 
+extension WidgetSchedule {
+    func isBefore(_ other: WidgetSchedule) -> Bool {
+        let selfHour = Int(start.split(separator: ":").first!)!
+        let otherHour = Int(other.start.split(separator: ":").first!)!
+        if selfHour != otherHour {
+            return selfHour < otherHour
+        }
+        let selfMinute = Int(start.split(separator: ":").last!)!
+        let otherMinute = Int(other.start.split(separator: ":").last!)!
+        return selfMinute < otherMinute
+    }
+}
+
 struct Provider: TimelineProvider {
     /// Returns an initialized database pool at the shared location databaseURL,
     /// or nil if the database is not created yet, or does not have the required
@@ -71,33 +84,50 @@ struct Provider: TimelineProvider {
         }
     }
     
-    func getSchedules(pool: DatabasePool, college: College, date: Date) throws -> [ScheduleInfo] {
-        let semester = try pool.read { db in
-            try Semester
-                .filter(Column("college") == college && Column("start_at") <= date && Column("end_at") > date)
-                .fetchOne(db)
+    func getSchedules(pool: DatabasePool, colleges: [College], date: Date) throws -> [ScheduleInfo] {
+        var schedules: [ScheduleInfo] = []
+        
+        for college in colleges {
+            let semester = try pool.read { db in
+                try Semester
+                    .filter(Column("college") == college && Column("start_at") <= date && Column("end_at") > date)
+                    .fetchOne(db)
+            }
+            
+            guard let semester = semester else {
+                return []
+            }
+            let week = date.weeksSince(semester.start_at)
+            
+            // TODO: College.custom
+            let request = Schedule
+                .including(required: Schedule.class_
+                    .including(required: Class.course)
+                    .filter(Column("semester_id") == semester.id)
+                )
+                .filter(
+                    Column("week") == week &&
+                    Column("is_start") == true &&
+                    Column("college") == college &&
+                    Column("day") == (date.get(.weekday) + 5) % 7
+                )
+                .order(Column("period"))
+            
+            schedules.append(contentsOf: try pool.read { db in
+                try ScheduleInfo.fetchAll(db, request)
+            })
         }
         
-        guard let semester = semester else {
-            return []
+        return schedules.sorted {
+            $0.schedule.period < $1.schedule.period
         }
-        let week = date.weeksSince(semester.start_at)
-        
-        let request = Schedule
-            .including(required: Schedule.class_
-                .including(required: Class.course)
-                .filter(Column("semester_id") == semester.id)
-            )
-            .filter(
-                Column("week") == week &&
-                Column("is_start") == true &&
-                [College.custom, college].contains(Column("college")) &&
-                Column("day") == (date.get(.weekday) + 5) % 7
-            )
-            .order(Column("period"))
-        
+    }
+
+    func getCustomSchedules(pool: DatabasePool, colleges: [College], date: Date) throws -> [CustomSchedule] {
         return try pool.read { db in
-            try ScheduleInfo.fetchAll(db, request)
+            try CustomSchedule
+                .filter(colleges.contains(Column("college")) && Column("begin") >= date.startOfDay() && Column("begin") < date.addDays(1).startOfDay())
+                .fetchAll(db)
         }
     }
 
@@ -108,16 +138,19 @@ struct Provider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (ScheduleEntry) -> ()) {
         let currentDate = Date()
         var collegeId = UserDefaults.shared.integer(forKey: "collegeId")
+        let showBothCollege = UserDefaults.shared.bool(forKey: "showBothCollege")
         if collegeId == 0 {
             collegeId = 1
         }
         let college = College(rawValue: collegeId)!
+        let colleges = (showBothCollege && college == College.sjtu) ? [.sjtu, .sjtug] : [college]
 
         do {
             if let db = try connectDB() {
                 let semester = try getSemester(pool: db, college: college, date: currentDate)
-                let schedules = try getSchedules(pool: db, college: college, date: currentDate)
-                            
+                let schedules = try getSchedules(pool: db, colleges: colleges, date: currentDate)
+                let customSchedules = try getCustomSchedules(pool: db, colleges: colleges, date: currentDate)
+
                 // Generate a timeline consisting of five entries an hour apart, starting from the current date.
                 var widgetSchedules: [WidgetSchedule] = []
                 for schedule in schedules {
@@ -136,6 +169,25 @@ struct Provider: TimelineProvider {
                         )
                     }
                 }
+                
+                for schedule in customSchedules {
+                    if schedule.end > currentDate {
+                        widgetSchedules.append(
+                            WidgetSchedule(
+                                start: schedule.begin.formatted(format: "H:mm"),
+                                end: schedule.end.formatted(format: "H:mm"),
+                                length: 0,
+                                name: schedule.name,
+                                location: schedule.location,
+                                color: schedule.color
+                            )
+                        )
+                    }
+                }
+                
+                widgetSchedules = widgetSchedules.sorted(by: {
+                    $0.isBefore($1)
+                })
                 
                 var status: DailyStatus = .hasSchedules
                 if schedules.count == 0 {
@@ -156,54 +208,69 @@ struct Provider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
         let currentDate = Date()
         var collegeId = UserDefaults.shared.integer(forKey: "collegeId")
+        let showBothCollege = UserDefaults.shared.bool(forKey: "showBothCollege")
         if collegeId == 0 {
             collegeId = 1
         }
         let college = College(rawValue: collegeId)!
-        
+        let colleges = (showBothCollege && college == College.sjtu) ? [.sjtu, .sjtug] : [college]
+
         do {
             if let db = try connectDB() {
                 let semester = try getSemester(pool: db, college: college, date: currentDate)
-                let schedules = try getSchedules(pool: db, college: college, date: currentDate)
-                
+                let schedules = try getSchedules(pool: db, colleges: colleges, date: currentDate)
+                let customSchedules = try getCustomSchedules(pool: db, colleges: colleges, date: currentDate)
+
                 var entries: [ScheduleEntry] = []
+                var widgetSchedules = schedules.map { schedule in
+                    WidgetSchedule(
+                        start: schedule.schedule.startTime(),
+                        end: schedule.schedule.finishTime(),
+                        length: schedule.schedule.length,
+                        name: "\(schedule.course.name)",
+                        location: schedule.schedule.classroom,
+                        color: schedule.class_.color
+                    )
+                }
+                widgetSchedules += customSchedules.map({ schedule in
+                    WidgetSchedule(
+                        start: schedule.begin.formatted(format: "H:mm"),
+                        end: schedule.end.formatted(format: "H:mm"),
+                        length: 0,
+                        name: schedule.name,
+                        location: schedule.location,
+                        color: schedule.color
+                    )
+                })
+                widgetSchedules = widgetSchedules.sorted(by: {
+                    $0.isBefore($1)
+                })
                 
                 // Generate a timeline consisting of five entries an hour apart, starting from the current date.
-                if schedules.count > 0 {
-                    for (index, schedule) in schedules.enumerated() {
-                        if currentDate.timeOfDay("H:mm", timeStr: schedule.schedule.finishTime())! < currentDate {
+                if widgetSchedules.count > 0 {
+                    for (index, schedule) in widgetSchedules.enumerated() {
+                        if currentDate.timeOfDay("H:mm", timeStr: schedule.end)! < currentDate {
                             continue
                         }
                         
                         // let entryDate = currentDate.timeOfDay("H:mm", timeStr: schedule.schedule.startTime())!
-                        let startDate = currentDate.timeOfDay("H:mm", timeStr: schedule.schedule.startTime())!
-                        let entryDate = index == 0 ? currentDate : currentDate.timeOfDay("H:mm", timeStr: schedules[index - 1].schedule.finishTime())!
-                        var widgetSchedules: [WidgetSchedule] = []
+                        let startDate = currentDate.timeOfDay("H:mm", timeStr: schedule.start)!
+                        let entryDate = index == 0 ? currentDate : currentDate.timeOfDay("H:mm", timeStr: widgetSchedules[index - 1].end)!
+                        var entrySchedules: [WidgetSchedule] = []
                         
-                        for i in index..<schedules.count {
-                            let schedule = schedules[i]
-                            
-                            widgetSchedules.append(
-                                WidgetSchedule(
-                                    start: schedule.schedule.startTime(),
-                                    end: schedule.schedule.finishTime(),
-                                    length: schedule.schedule.length,
-                                    name: "\(schedule.course.name)",
-                                    location: schedule.schedule.classroom,
-                                    color: schedule.class_.color
-                                )
-                            )
+                        for i in index..<widgetSchedules.count {
+                            entrySchedules.append(widgetSchedules[i])
                         }
                         
                         entries.append(
-                            ScheduleEntry(date: entryDate, schedules: widgetSchedules, semester: semester, status: widgetSchedules.count > 0 ? .hasSchedules : .allSchedulesFinished)
+                            ScheduleEntry(date: entryDate, schedules: entrySchedules, semester: semester, status: entrySchedules.count > 0 ? .hasSchedules : .allSchedulesFinished)
                         )
                         entries.append(
-                            ScheduleEntry(date: startDate, schedules: widgetSchedules, semester: semester, status: widgetSchedules.count > 0 ? .hasSchedules : .allSchedulesFinished)
+                            ScheduleEntry(date: startDate, schedules: entrySchedules, semester: semester, status: entrySchedules.count > 0 ? .hasSchedules : .allSchedulesFinished)
                         )
                     }
                     
-                    entries.append(ScheduleEntry(date: currentDate.timeOfDay("H:mm", timeStr: schedules.last!.schedule.finishTime())!, schedules: [], semester: semester, status: .allSchedulesFinished))
+                    entries.append(ScheduleEntry(date: currentDate.timeOfDay("H:mm", timeStr: widgetSchedules.last!.end)!, schedules: [], semester: semester, status: .allSchedulesFinished))
 
                     let timeline = Timeline(entries: entries, policy: .after(currentDate.addDays(1).startOfDay()))
                     completion(timeline)

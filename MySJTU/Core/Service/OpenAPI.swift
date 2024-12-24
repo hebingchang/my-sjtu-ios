@@ -10,11 +10,11 @@ import Alamofire
 import SwiftSoup
 import Apollo
 
-enum APIError: Error {
+enum APIError: Error, Equatable {
+    case runtimeError(String)
+    case remoteError(String)
     case sessionExpired
-    case badCSRF
     case noAccount
-    case getCourseInfoFailed
     case internalError
 }
 
@@ -73,13 +73,14 @@ struct SHSMUOpenAPI {
     }
 
     private struct SHSMUSchedule: Codable {
-        let curriculum, courseCode: String
+        let curriculum: String
+        let courseCode: String?
         let courseCount: Int
         let classroomAcademy, start: String
         let curriculumType: String
-        let mcsid: String
+        let mcsid: String?
         let csid: Int?
-        let curriculumID: Int
+        let curriculumID: Int?
         let xxkmid: Int?
 
         enum CodingKeys: String, CodingKey {
@@ -98,10 +99,12 @@ struct SHSMUOpenAPI {
     
     struct SHSMUCourse: Codable {
         let className, courseName, classCode: String
+        let content: String?
         let id, teachingCalendarID: Int
         let curriculumScheduleIDs: String
         let classTime: String
-        let classHour, curriculumType: Int
+        let curriculumType: Int
+        let classHour: Double
         let teacher, teacherAccount, college, collegeCode: String
         let workNumber, title: String
         let curriculumName, kcIndex, courseText, welcomeClassroomName: String
@@ -113,6 +116,7 @@ struct SHSMUOpenAPI {
             case className = "ClassName"
             case courseName = "CourseName"
             case classCode = "ClassCode"
+            case content = "Content"
             case id = "ID"
             case teachingCalendarID = "TeachingCalendarID"
             case curriculumScheduleIDs = "CurriculumScheduleIDs"
@@ -136,7 +140,7 @@ struct SHSMUOpenAPI {
         }
     }
     
-    func getSchedules(semester: Semester) async throws -> [([String: String], CourseClassSchedule)] {
+    func getSchedules(semester: Semester, onProgress: (_ fraction: Double) -> Void) async throws -> [CourseClassSchedule] {
         let start = semester.start_at.formattedDate()
         let end = semester.end_at.formattedDate()
                 
@@ -157,89 +161,128 @@ struct SHSMUOpenAPI {
             encoding: URLEncoding(destination: .queryString)
         ).serializingDecodable(Response<SHSMUSchedule>.self).value
         
-        var classes: [([String: String], CourseClassSchedule)] = []
+        var classes: [CourseClassSchedule] = []
         let colors = ClassColors.randomColors()
         
+        // initiate classes
         for schedule in response.list {
-            var classIndex = classes.firstIndex(where: { $0.1.class_.id == String(schedule.curriculumID) })
-            if classIndex == nil {
-                classes.append((
-                    [
-                        "MCSID": schedule.mcsid,
+            if let courseCode = schedule.courseCode,
+               schedule.mcsid != nil,
+               let curriculumID = schedule.curriculumID {
+                var classIndex = classes.firstIndex(where: { $0.class_.id == String(curriculumID) })
+                if classIndex == nil {
+                    classes.append((
+                        CourseClassSchedule(
+                            course: Course(code: courseCode.trimSpace(), college: .shsmu, name: schedule.curriculum.trimSpace()),
+                            class_: Class(
+                                id: String(curriculumID),
+                                college: .shsmu,
+                                color: colors[classes.count],
+                                course_code: courseCode.trimSpace(),
+                                name: schedule.curriculum.trimSpace(),
+                                code: courseCode.trimSpace(),
+                                teachers: [],
+                                hours: -1,
+                                credits: -1,
+                                semester_id: semester.id
+                            ),
+                            schedules: []
+                        )
+                    ))
+                    classIndex = classes.count - 1
+                }
+            } else if schedule.curriculumType == "考试" {
+                // TODO: exam schedule
+            }
+        }
+        
+        var progress = 0
+        // initiate schedules
+        for schedule in response.list {
+            if let mcsid = schedule.mcsid,
+               let curriculumID = schedule.curriculumID {
+                let classIndex = classes.firstIndex(where: { $0.class_.id == String(curriculumID) })!
+                
+                let response = try await AF.request(
+                    "\(baseUrl)/Home/GetCalendarTable",
+                    parameters: [
+                        "MCSID": mcsid,
                         "CSID": schedule.csid != nil ? String(schedule.csid!) : "null",
-                        "CurriculumID": String(schedule.curriculumID),
+                        "CurriculumID": String(curriculumID),
                         "XXKMID": schedule.xxkmid != nil ? String(schedule.xxkmid!) : "null",
                         "CurriculumType": schedule.curriculumType
                     ],
-                    CourseClassSchedule(
-                        course: Course(code: schedule.courseCode.trimSpace(), college: .shsmu, name: schedule.curriculum.trimSpace()),
-                        class_: Class(
-                            id: String(schedule.curriculumID),
-                            college: .shsmu,
-                            color: colors[classes.count],
-                            course_code: schedule.courseCode.trimSpace(),
-                            name: schedule.curriculum.trimSpace(),
-                            code: schedule.courseCode.trimSpace(),
-                            teachers: [],
-                            hours: -1,
-                            credits: 01,
-                            semester_id: semester.id
-                        ),
-                        schedules: []
-                    )
-                ))
-                classIndex = classes.count - 1
-            }
-            
-            if let startPeriod = getPeriodByTime(college: .shsmu, time: String(schedule.start.split(separator: "T")[1])) {
-                for i in 0..<schedule.courseCount {
-                    if let start = Date.fromFormat("yyyy-MM-dd'T'HH:mm:ss", dateStr: schedule.start, calendar: .iso8601) {
-                        classes[classIndex!].1.schedules.append(Schedule(
-                            class_id: classes[classIndex!].1.class_.id,
-                            college: .shsmu,
-                            classroom: schedule.classroomAcademy.trimSpace(),
-                            day: (start.get(.weekday) + 5) % 7,
-                            period: (startPeriod.id >= 5 ? startPeriod.id + 1 : startPeriod.id) + i,
-                            week: start.weeksSince(semester.start_at),
-                            is_start: i == 0,
-                            length: i == 0 ? schedule.courseCount : 0
-                        ))
+                    encoding: URLEncoding(destination: .queryString)
+                ).serializingDecodable([SHSMUCourse].self).value.sorted { $0.kcIndex < $1.kcIndex }
+                
+                
+                if let startPeriod = getPeriodByTime(college: .shsmu, time: String(schedule.start.split(separator: "T")[1])) {
+                    for i in 0..<schedule.courseCount {
+                        if let start = Date.fromFormat("yyyy-MM-dd'T'HH:mm:ss", dateStr: schedule.start, calendar: .iso8601) {
+                            var dbSchedule = Schedule(
+                                class_id: classes[classIndex].class_.id,
+                                college: .shsmu,
+                                classroom: schedule.classroomAcademy.trimSpace(),
+                                day: (start.get(.weekday) + 5) % 7,
+                                period: (startPeriod.id >= 5 ? startPeriod.id + 1 : startPeriod.id) + i,
+                                week: start.weeksSince(semester.start_at),
+                                is_start: i == 0,
+                                length: i == 0 ? schedule.courseCount : 0
+                            )
+                            
+                            if i == 0 {
+                                dbSchedule.teachers = Array(Set(response.map { part in
+                                    part.teacher
+                                }))
+                                dbSchedule.remark = response.map { part in
+                                    "\(part.courseText)：\(part.content ?? "未知内容") (\(part.teacher))"
+                                }.joined(separator: "\n")
+                            }
+                            
+                            classes[classIndex].schedules.append(dbSchedule)
+                        }
                     }
                 }
             }
+            
+            progress += 1
+            onProgress(Double(progress) / Double(response.list.count))
         }
 
         return classes
     }
     
-    func getCourseInfo(schedule: ([String: String], CourseClassSchedule)) async throws -> CourseClassSchedule {
+    func getCourseInfo(schedule: ([[String: String]], CourseClassSchedule)) async throws -> CourseClassSchedule {
         cookies.forEach { cookie in
             AF.session.configuration.httpCookieStorage?.setCookie(cookie)
         }
         
-        print(schedule.0)
-        let response = try await AF.request(
-            "\(baseUrl)/Home/GetCalendarTable",
-            parameters: schedule.0,
-            encoding: URLEncoding(destination: .queryString)
-        ).serializingDecodable([SHSMUCourse].self).value
-        
-        if response.count == 0 {
-            throw APIError.getCourseInfoFailed
+        for parameter in schedule.0 {
+            let response = try await AF.request(
+                "\(baseUrl)/Home/GetCalendarTable",
+                parameters: parameter,
+                encoding: URLEncoding(destination: .queryString)
+            ).serializingDecodable([SHSMUCourse].self).value
+            
+            if response.count == 0 {
+                continue
+            }
+            
+            var newSchedule = schedule.1
+            let org = Set(response.map {
+                $0.college.trimSpace()
+            }).joined(separator: "，")
+            newSchedule.organization = Organization(id: org, college: .shsmu, name: org)
+            newSchedule.class_.organization_id = org
+            newSchedule.class_.teachers = Array(Set(response.map {
+                $0.teacher.trimSpace()
+            }))
+            newSchedule.class_.name = response.first!.curriculumName.trimSpace()
+
+            return newSchedule
         }
         
-        var newSchedule = schedule.1
-        let org = Set(response.map {
-            $0.college.trimSpace()
-        }).joined(separator: "，")
-        newSchedule.organization = Organization(id: org, college: .shsmu, name: org)
-        newSchedule.class_.organization_id = org
-        newSchedule.class_.teachers = Array(Set(response.map {
-            $0.teacher.trimSpace()
-        }))
-        newSchedule.class_.name = response.first!.curriculumName.trimSpace()
-
-        return newSchedule
+        throw APIError.runtimeError("无法获取课程信息")
     }
 }
 
@@ -484,7 +527,174 @@ struct SJTUOpenAPI {
             ],
             encoding: URLEncoding(destination: .queryString)
         ).serializingDecodable(OpenApiResponse<Unicode>.self).value
-        return response.entities[0]
+        
+        if let entities = response.entities, entities.count > 0 {
+            return entities[0]
+        } else {
+            throw APIError.remoteError("服务器未返回思源码")
+        }
+    }
+    
+    func getUnicodeTransactions(start: Int? = nil, limit: Int? = nil, beginDate: Int? = nil, endDate: Int? = nil) async throws -> [UnicodeTransaction] {
+        let token = try await getToken(scopes: ["unicode"])
+        var parameters: [String: any Codable] = [
+            "access_token": token.access_token
+        ]
+        if let beginDate {
+            parameters["beginDate"] = beginDate
+        }
+        if let endDate {
+            parameters["endDate"] = endDate
+        }
+        if let start {
+            parameters["start"] = start
+        }
+        if let limit {
+            parameters["limit"] = limit
+        }
+        let response = try await AF.request(
+            "https://api.sjtu.edu.cn/v1/unicode/transactions",
+            parameters: parameters,
+            encoding: URLEncoding(destination: .queryString)
+        ).serializingDecodable(OpenApiResponse<UnicodeTransaction>.self).value
+                
+        return response.entities ?? []
+    }
+    
+    func getCampusCards() async throws -> [CampusCard] {
+        let token = try await getToken(scopes: ["card"])
+        let response = try await AF.request(
+            "https://api.sjtu.edu.cn/v1/me/card",
+            parameters: [
+                "access_token": token.access_token
+            ],
+            encoding: URLEncoding(destination: .queryString)
+        ).serializingDecodable(OpenApiResponse<CampusCard>.self).value
+        return response.entities ?? []
+    }
+    
+    func chargeCampusCard(cardNo: String, amount: Int) async throws -> CardChargeResponse {
+        let token = try await getToken(scopes: ["card"])
+        let response = try await AF.request(
+            "https://api.sjtu.edu.cn/v1/me/card/recharge",
+            method: .post,
+            parameters: [
+                "access_token": token.access_token,
+                "amount": amount,
+                "cardNo": cardNo
+            ],
+            encoding: URLEncoding.httpBody,
+            headers: [
+                "User-Agent": "TaskCenterApp/3.4.6/iPhone16,1/ScreenFringe (iOS,iPhone,18.2; Scale/3.0)"
+            ]
+        ).serializingDecodable(OpenApiResponse<CardChargeResponse>.self).value
+        if response.errno != 0 {
+            throw APIError.remoteError(response.error)
+        } else if let entities = response.entities, entities.count > 0 {
+            return entities[0]
+        } else {
+            throw APIError.remoteError("服务器没有返回数据")
+        }
+    }
+    
+    func getChargeStatus(cardNo: String, orderId: Int64) async throws -> CardChargeStatus {
+        let token = try await getToken(scopes: ["card"])
+        let response = try await AF.request(
+            "https://api.sjtu.edu.cn/v1/me/card/recharge",
+            parameters: [
+                "access_token": token.access_token,
+                "cardNo": cardNo,
+                "id": orderId
+            ],
+            encoding: URLEncoding(destination: .queryString),
+            headers: [
+                "User-Agent": "TaskCenterApp/3.4.6/iPhone16,1/ScreenFringe (iOS,iPhone,18.2; Scale/3.0)"
+            ]
+        ).serializingDecodable(OpenApiResponse<CardChargeStatus>.self).value
+        if response.errno != 0 {
+            throw APIError.remoteError(response.error)
+        } else if let entities = response.entities, entities.count > 0 {
+            return entities[0]
+        } else {
+            throw APIError.remoteError("服务器没有返回数据")
+        }
+    }
+    
+    func getUncompleteCharges(cardNo: String) async throws -> [CardChargeStatus] {
+        let token = try await getToken(scopes: ["card"])
+        let response = try await AF.request(
+            "https://api.sjtu.edu.cn/v1/me/card/recharge",
+            parameters: [
+                "access_token": token.access_token,
+                "cardNo": cardNo
+            ],
+            encoding: URLEncoding(destination: .queryString),
+            headers: [
+                "User-Agent": "TaskCenterApp/3.4.6/iPhone16,1/ScreenFringe (iOS,iPhone,18.2; Scale/3.0)"
+            ]
+        ).serializingDecodable(OpenApiResponse<CardChargeStatus>.self).value
+        if response.errno != 0 {
+            throw APIError.remoteError(response.error)
+        }
+        return response.entities ?? []
+    }
+    
+    func getProfile() async throws -> Profile {
+        let token = try await getToken(scopes: ["privacy"])
+        let response = try await AF.request(
+            "https://api.sjtu.edu.cn/v1/me/profile",
+            parameters: [
+                "access_token": token.access_token
+            ],
+            encoding: URLEncoding(destination: .queryString)
+        ).serializingDecodable(OpenApiResponse<Profile>.self).value
+        
+        if let entities = response.entities, entities.count > 0 {
+            return entities[0]
+        } else {
+            throw APIError.remoteError("服务器未返回用户信息")
+        }
+    }
+    
+    func getCardPhoto(cardNo: String) async throws -> String? {
+        let token = try await getToken(scopes: ["privacy"])
+        let response = try await AF.request(
+            "https://api.sjtu.edu.cn/v1/me/card/photo",
+            parameters: [
+                "access_token": token.access_token,
+                "cardNo": cardNo,
+                "urlOnly": true
+            ],
+            encoding: URLEncoding(destination: .queryString)
+        ).serializingDecodable(OpenApiResponse<CardPhoto>.self).value
+        
+        return response.entities?.first?.url
+    }
+    
+    func getCardTransactions(cardNo: String, start: Int? = nil, limit: Int? = nil, beginDate: Int? = nil, endDate: Int? = nil) async throws -> (Int, [CardTransaction]) {
+        let token = try await getToken(scopes: ["card"])
+        var parameters: [String: any Codable] = [
+            "access_token": token.access_token,
+            "cardNo": cardNo,
+        ]
+        if let beginDate {
+            parameters["beginDate"] = beginDate
+        }
+        if let endDate {
+            parameters["endDate"] = endDate
+        }
+        if let start {
+            parameters["start"] = start
+        }
+        if let limit {
+            parameters["limit"] = limit
+        }
+        let response = try await AF.request(
+            "https://api.sjtu.edu.cn/v1/me/card/transactions",
+            parameters: parameters,
+            encoding: URLEncoding(destination: .queryString)
+        ).serializingDecodable(OpenApiResponse<CardTransaction>.self).value
+        return (response.total, response.entities ?? [])
     }
     
     func getSchedules(semester: Semester, sample: Bool = false) async throws -> [CourseClassSchedule] {
@@ -503,11 +713,12 @@ struct SJTUOpenAPI {
         }
         
         guard let response else {
-            throw APIError.internalError
+            throw APIError.remoteError("无法获取课程列表")
         }
         
-        let colors = ClassColors.randomColors(n: response.entities.count)
-        return response.entities.enumerated().map { (index, entity) in
+        let entities = response.entities ?? []
+        let colors = ClassColors.randomColors(n: entities.count)
+        return entities.enumerated().map { (index, entity) in
             var isStartFlags: [Int: Bool] = [:]
             
             return CourseClassSchedule(
@@ -591,6 +802,17 @@ struct CanvasAPI {
         }
     }
     
+    struct Event: Codable {
+        let title: String
+        let description: String
+        let type: String
+        let assignment: Assignment?
+    }
+    
+    struct Assignment: Codable {
+        let id: Int
+    }
+    
     func openIdConnect() async throws {
         guard let cookies else { throw APIError.sessionExpired }
         
@@ -635,7 +857,7 @@ struct CanvasAPI {
         }
         
         guard let csrfToken else {
-            throw APIError.badCSRF
+            throw APIError.runtimeError("获取 CSRF 错误")
         }
         
         return csrfToken
@@ -789,6 +1011,70 @@ struct CanvasAPI {
         return assignments
     }
     
+    func getAssignmentDetail(assignmentId: String) async throws -> CanvasSchema.GetAssignmentDetailQuery.Data.Assignment? {
+        guard client != nil else {
+            throw APIError.noAccount
+        }
+        
+        let query = CanvasSchema.GetAssignmentDetailQuery(assignmentId: assignmentId)
+        
+        for try await result in client!.fetch(query: query) {
+            return result.data?.assignment
+        }
+        
+        return nil
+    }
+    
+    func getAssignments(assignmentIds: [Int]) async throws -> [CanvasSchema.GetAssignmentQuery.Data.Assignment] {
+        guard let client else {
+            throw APIError.noAccount
+        }
+        
+        return await withTaskGroup(of: CanvasSchema.GetAssignmentQuery.Data.Assignment?.self) { group in
+            var results: [CanvasSchema.GetAssignmentQuery.Data.Assignment] = []
+            
+            for id in assignmentIds {
+                group.addTask {
+                    do {
+                        let query = CanvasSchema.GetAssignmentQuery(assignmentId: String(id))
+                        for try await result in client.fetch(query: query) {
+                            if let assignment = result.data?.assignment {
+                                return assignment
+                            }
+                        }
+                    } catch {
+                        print(error)
+                    }
+                    
+                    return nil
+                }
+            }
+            
+            for await result in group {
+                if let result {
+                    results.append(result)
+                }
+            }
+            
+            return results
+        }
+    }
+    
+    func getUpcomingEvents() async throws -> [Event] {
+        guard let token else {
+            throw APIError.noAccount
+        }
+        
+        let response = try await AF.request(
+            "https://oc.sjtu.edu.cn/api/v1/users/self/upcoming_events",
+            headers: [
+                "Authorization": "Bearer \(token)"
+            ]
+        ).serializingDecodable([Event].self).value
+        
+        return response
+    }
+    
     func checkToken() async throws {
         guard let token else {
             throw APIError.noAccount
@@ -801,11 +1087,10 @@ struct CanvasAPI {
             ]
         ).serializingData().response
         
-        
         if response.response?.statusCode == 401 {
             throw APIError.sessionExpired
         } else if response.response?.statusCode != 200 {
-            throw APIError.internalError
+            throw APIError.remoteError("状态码错误")
         }
     }
 }

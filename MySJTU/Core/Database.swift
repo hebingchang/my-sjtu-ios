@@ -12,44 +12,51 @@ import SQLite3
 
 enum EloquentError: Error {
     case dbNotOpened
+    case missingPrimaryKey
 }
 
 struct SchedulesRequest: ValueObservationQueryable {
     static var defaultValue: [ScheduleInfo] {
         []
     }
-    var college: College?
+    var colleges: [College]?
     var date: Date?
     var isWeek: Bool = false
 
     func fetch(_ db: Database) throws -> [ScheduleInfo] {
-        guard let college = college else {
+        guard let colleges = colleges else {
             return []
         }
         guard let date = date else {
             return []
         }
-
-        let semester = try Semester
-            .filter(Column("college") == college && Column("start_at") <= date && Column("end_at") > date)
-            .fetchOne(db)
-        guard let semester = semester else {
-            return []
-        }
-        let week = date.weeksSince(semester.start_at)
-
-        var filter = Column("week") == week && Column("is_start") == true && [College.custom, college].contains(Column("college"))
-        if !isWeek {
-            let day = (date.get(.weekday) + 5) % 7
-            filter = filter && Column("day") == day
-        }
-        let request = Schedule
-            .including(required: Schedule.class_
-                .including(required: Class.course)
-                .filter(Column("semester_id") == semester.id))
-            .filter(filter)
         
-        return try ScheduleInfo.fetchAll(db, request)
+        var schedules: [ScheduleInfo] = []
+        
+        for college in colleges {
+            let semester = try Semester
+                .filter(colleges.contains(Column("college")) && Column("start_at") <= date && Column("end_at") > date)
+                .fetchOne(db)
+            guard let semester = semester else {
+                return []
+            }
+            let week = date.weeksSince(semester.start_at)
+            
+            // TODO: .custom
+            var filter = Column("week") == week && Column("is_start") == true && Column("college") == college
+            if !isWeek {
+                let day = (date.get(.weekday) + 5) % 7
+                filter = filter && Column("day") == day
+            }
+            let request = Schedule
+                .including(required: Schedule.class_
+                    .including(required: Class.course)
+                    .filter(Column("semester_id") == semester.id))
+                .filter(filter)
+            schedules.append(contentsOf: try ScheduleInfo.fetchAll(db, request))
+        }
+        
+        return schedules
     }
 }
 
@@ -74,6 +81,29 @@ struct SemestersRequest: ValueObservationQueryable {
         return try Semester
             .filter(Column("college") == college)
             .order(Column("start_at").desc)
+            .fetchAll(db)
+    }
+}
+
+struct CustomSchedulesRequest: ValueObservationQueryable {
+    static var defaultValue: [CustomSchedule] {
+        []
+    }
+    var colleges: [College]
+    var date: Date
+    var isWeek: Bool = false
+
+    func fetch(_ db: Database) throws -> [CustomSchedule] {
+        var filter = colleges.contains(Column("college"))
+        
+        if isWeek {
+            filter = filter && Column("begin") >= date.startOfWeek() && Column("begin") < date.addWeeks(1).startOfWeek()
+        } else {
+            filter = filter && Column("begin") >= date.startOfDay() && Column("begin") < date.addDays(1).startOfDay()
+        }
+
+        return try CustomSchedule
+            .filter(filter)
             .fetchAll(db)
     }
 }
@@ -227,7 +257,7 @@ class Eloquent {
                 t.column("organization_id", .text)
                 t.column("name", .text)
                 t.column("code", .text)
-                t.column("teachers", .text)
+                t.column("teachers", .jsonText)
                 t.column("hours", .real)
                 t.column("credits", .real)
                 t.column("semester_id", .text)
@@ -289,6 +319,32 @@ class Eloquent {
             }
         }
         
+        // v2
+        migrator.registerMigration("add_teachers_column_to_schedules") { db in
+            try db.alter(table: "schedules") { t in
+                t.add(column: "teachers", .jsonText)
+                t.add(column: "remark", .text)
+            }
+        }
+        
+        // v3
+        migrator.registerMigration("add_custom_schedules") { db in
+            try db.create(table: "custom_schedules", ifNotExists: true) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("name", .text)
+                t.column("description", .text)
+                t.column("location", .text)
+                t.column("begin", .datetime)
+                t.column("end", .datetime)
+                t.column("semester_id", .text)
+                t.column("week", .integer)
+                t.column("day", .integer)
+                t.column("category", .text)
+                t.column("college", .integer)
+                t.column("color", .text)
+            }
+        }
+        
         try migrator.migrate(pool)
     }
 
@@ -328,7 +384,7 @@ class Eloquent {
             .filter(
                 Column("week") == week &&
                 Column("is_start") == true &&
-                [College.custom, college].contains(Column("college")) &&
+                [college].contains(Column("college")) &&
                 Column("day") == (date.get(.weekday) + 5) % 7
             )
         
@@ -360,6 +416,53 @@ class Eloquent {
                     try remark.save(db)
                 }
             }
+        }
+    }
+    
+    static func deleteCustomSchedule(id: Int64) async throws {
+        guard let connection = Eloquent.pool else {
+            throw EloquentError.dbNotOpened
+        }
+        
+        _ = try await connection.write { db in
+            try CustomSchedule.deleteOne(db, key: id)
+        }
+    }
+    
+    static func saveCustomSchedule(entry: CustomScheduleEntry) async throws {
+        guard let connection = Eloquent.pool else {
+            throw EloquentError.dbNotOpened
+        }
+        
+        var schedule = CustomSchedule(
+            name: entry.name,
+            description: entry.description,
+            location: entry.location,
+            begin: entry.begin,
+            end: entry.end,
+            category: .custom,
+            college: entry.college,
+            color: entry.color
+        )
+        
+        if let id = entry.id {
+            schedule.id = id
+        }
+        
+        if let college = entry.college {
+            if let semester = try await connection.read({ db in
+                try Semester
+                    .filter(Column("college") == college && Column("start_at") <= entry.begin && Column("end_at") > entry.begin)
+                    .fetchOne(db)
+            }) {
+                schedule.semester_id = semester.id
+                schedule.week = entry.begin.weeksSince(semester.start_at)
+            }
+        }
+        
+        let scheduleToSave = schedule
+        try await connection.write { db in
+            try scheduleToSave.save(db)
         }
     }
 }

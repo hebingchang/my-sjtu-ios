@@ -6,10 +6,14 @@
 //
 
 enum College: Int {
-    case custom = 0
     case sjtu = 1
     case shsmu = 2
     case sjtug = 3
+}
+
+enum CustomScheduleCategory: String, Codable {
+    case custom = "custom"
+    case exam = "exam"
 }
 
 struct CourseClassSchedule: Codable {

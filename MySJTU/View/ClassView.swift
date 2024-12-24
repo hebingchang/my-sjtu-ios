@@ -22,6 +22,7 @@ struct ClassView: View {
     @State private var showError: Bool = false
     @State private var presentAccountPage: Bool = false
     @State private var errorDetail: ClassViewError?
+    @State private var syllabusText: AttributedString?
 
     private enum ClassViewError: Error {
         case canvasTokenExpired
@@ -59,18 +60,35 @@ struct ClassView: View {
                         HStack {
                             Text("教师")
                             Spacer()
-                            Text(scheduleInfo.class_.teachers.joined(separator: "、"))
-                                .font(.callout)
-                                .foregroundStyle(Color(UIColor.secondaryLabel))
+                            if let teachers = scheduleInfo.schedule.teachers, teachers.count > 0 {
+                                Text(teachers.joined(separator: "、"))
+                                    .font(.callout)
+                                    .foregroundStyle(Color(UIColor.secondaryLabel))
+                            } else {
+                                Text(scheduleInfo.class_.teachers.joined(separator: "、"))
+                                    .font(.callout)
+                                    .foregroundStyle(Color(UIColor.secondaryLabel))
+                            }
+                        }
+                        if let remark = scheduleInfo.schedule.remark {
+                            HStack {
+                                Text("备注")
+                                Spacer()
+                                Text(remark)
+                                    .font(.callout)
+                                    .foregroundStyle(Color(UIColor.secondaryLabel))
+                                    .multilineTextAlignment(.trailing)
+                            }
                         }
                     }
                     
-                    //            if let canvasClassInfo, let syllabus = canvasClassInfo.syllabusBody {
-                    //                Section(header: Text("课程大纲")) {
-                    //                    Text(syllabus.attributedHtmlString?.string ?? "")
-                    //                }
-                    //            }
+                    if let syllabusText {
+                        Section(header: Text("课程大纲")) {
+                            Text(syllabusText)
+                        }
+                    }
                 }
+                .animation(.easeInOut, value: syllabusText)
             }
             
             if page == 1 {
@@ -115,11 +133,23 @@ struct ClassView: View {
                             ForEach(sections, id: \.0) { (section, assignments) in
                                 Section(header: Text(section)) {
                                     ForEach(assignments, id: \.id) { assignment in
-                                        VStack(alignment: .leading) {
+                                        NavigationLink {
+                                            CanvasAssignmentView(assignmentId: assignment.id, assignmentName: assignment.name ?? "")
+                                        } label: {
                                             HStack {
-                                                Text((assignment.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
-                                                    .fontWeight(.medium)
+                                                VStack(alignment: .leading) {
+                                                    Text((assignment.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+                                                        .fontWeight(.medium)
+                                                    
+                                                    if let dueAt = assignment.dueAt {
+                                                        Text("截止时间 \(dateFormatter.date(from: dueAt)!.formatted())")
+                                                            .font(.caption)
+                                                            .foregroundColor(Color(UIColor.secondaryLabel))
+                                                    }
+                                                }
+                                                
                                                 Spacer()
+                                                
                                                 if let submissions = assignment.submissionsConnection?.nodes, submissions.count > 0 {
                                                     let lastSubmission = submissions.sorted {
                                                         $0!.attempt < $1!.attempt
@@ -137,12 +167,6 @@ struct ClassView: View {
                                                         Image(systemName: "checkmark")
                                                     }
                                                 }
-                                            }
-                                            
-                                            if let dueAt = assignment.dueAt {
-                                                Text("截止时间 \(dateFormatter.date(from: dueAt)!.formatted())")
-                                                    .font(.caption)
-                                                    .foregroundColor(Color(UIColor.secondaryLabel))
                                             }
                                         }
                                     }
@@ -260,6 +284,22 @@ struct ClassView: View {
                         if let account, account.enabledFeatures.contains(.canvas), account.bizData["canvas_token"] != nil {
                             let client = CanvasAPI(token: account.bizData["canvas_token"]!)
                             self.canvasClassInfo = try await client.getClass(classId: canvasClass.id)
+                            
+                            DispatchQueue.main.async {
+                                if let syllabus = canvasClassInfo?.syllabusBody {
+                                    if let data = syllabus.data(using: .utf8) {
+                                        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+                                            .documentType: NSAttributedString.DocumentType.html,
+                                            .characterEncoding: String.Encoding.utf8.rawValue
+                                        ]
+                                        if let syllabusBody = try? NSAttributedString(data: data, options: options, documentAttributes: nil) {
+                                            self.syllabusText = try? AttributedString(syllabusBody, including: \.uiKit)
+                                            self.syllabusText?.foregroundColor = UIColor.label
+                                            self.syllabusText?.font = UIFont.preferredFont(forTextStyle: .callout)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 } catch {

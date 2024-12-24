@@ -39,6 +39,7 @@ struct UnicodeView: View {
     @State private var originalBrightness: CGFloat?
     @State private var showPhotosPicker: Bool = false
     @State private var selectedImage: UIImage?
+    @State private var photoBackground: Color?
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject private var appConfig: AppConfig
 
@@ -48,7 +49,7 @@ struct UnicodeView: View {
         if appConfig.appStatus == .review {
             user = WebAuthUser(account: "test_user", name: "测试用户", code: "524030910001")
             let response: OpenApiResponse<Unicode> = try await getUnicodeSample()
-            if let code = response.entities[0].code {
+            if let entities = response.entities, let code = entities[0].code {
                 self.qrShape = try QRCodeShape(
                     text: code,
                     errorCorrection: .medium,
@@ -178,6 +179,14 @@ struct UnicodeView: View {
                                 if let image = phase.image {
                                     image.resizable()
                                         .aspectRatio(contentMode: .fit)
+                                        .task {
+                                            if customAvatar == nil, let cgi = ImageRenderer(content: image).cgImage {
+                                                if let dp = cgi.dataProvider, let pixelData = dp.data {
+                                                    let data: UnsafePointer<UInt8> = CFDataGetBytePtr(pixelData)
+                                                    photoBackground = Color(red: Double(data[0]) / 255, green: Double(data[1]) / 255, blue: Double(data[2]) / 255)
+                                                }
+                                            }
+                                        }
                                 } else if phase.error != nil {
                                     Image(uiImage: UIImage(named: "avatar_placeholder")!)
                                         .resizable()
@@ -187,7 +196,7 @@ struct UnicodeView: View {
                             }
                         }
                         .frame(width: 96, height: 96)
-                        .background(Color.white)
+                        .background(photoBackground ?? Color.white)
                         .clipShape(Circle())
                         .offset(y: -64)
                         
@@ -226,6 +235,7 @@ struct UnicodeView: View {
                         Text("可用于闸机认证等用途，但不可用于支付。")
                             .font(.footnote)
                     }
+                    .foregroundStyle(Color(UIColor.secondaryLabel))
                     .frame(maxHeight: .infinity)
                 }
                 .background {

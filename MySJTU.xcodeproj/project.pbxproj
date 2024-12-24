@@ -7,7 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5A2059362D11E887003C850D /* MySJTULite.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5A2059132D11E886003C850D /* MySJTULite.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5A2059452D11EA0B003C850D /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9F0FBB2CF3596F001A91B1 /* WidgetKit.framework */; };
+		5A2059462D11EA0B003C850D /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9F0FBD2CF3596F001A91B1 /* SwiftUI.framework */; };
+		5A20594F2D11EA0D003C850D /* MySJTULiteWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5A2059442D11EA0B003C850D /* MySJTULiteWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5A2059652D12A37B003C850D /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 5A2059642D12A37B003C850D /* GRDB */; };
+		5A2059672D12A38A003C850D /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 5A2059662D12A38A003C850D /* GRDB */; };
+		5A2059692D12A395003C850D /* GRDBQuery in Frameworks */ = {isa = PBXBuildFile; productRef = 5A2059682D12A395003C850D /* GRDBQuery */; };
+		5A20596B2D12A39D003C850D /* GRDBQuery in Frameworks */ = {isa = PBXBuildFile; productRef = 5A20596A2D12A39D003C850D /* GRDBQuery */; };
 		5A4117A12CF5E87800AC0B8A /* SwiftyCrop in Frameworks */ = {isa = PBXBuildFile; productRef = 5A4117A02CF5E87800AC0B8A /* SwiftyCrop */; };
+		5A65AB2E2D0C698700AE5000 /* FeedKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5A65AB2D2D0C698700AE5000 /* FeedKit */; };
+		5A65AB352D0C74F500AE5000 /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 5A65AB342D0C74F500AE5000 /* Collections */; };
 		5A7A25CD2CE09560003F677F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25CC2CE09560003F677F /* Lottie */; };
 		5A7A25D32CE0D795003F677F /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25D22CE0D795003F677F /* Alamofire */; };
 		5A7A25DC2CE3212E003F677F /* QRCode in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25DB2CE3212E003F677F /* QRCode */; };
@@ -27,6 +37,34 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		5A2059232D11E887003C850D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5AE57A4D2CA8013700A42DE6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5A2059122D11E886003C850D;
+			remoteInfo = "MySJTULite Watch App";
+		};
+		5A20592D2D11E887003C850D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5AE57A4D2CA8013700A42DE6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5A2059122D11E886003C850D;
+			remoteInfo = "MySJTULite Watch App";
+		};
+		5A2059342D11E887003C850D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5AE57A4D2CA8013700A42DE6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5A2059122D11E886003C850D;
+			remoteInfo = "MySJTULite Watch App";
+		};
+		5A20594D2D11EA0D003C850D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5AE57A4D2CA8013700A42DE6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5A2059432D11EA0B003C850D;
+			remoteInfo = MySJTULiteWidgetExtension;
+		};
 		5A7D7FC62CF490C8001C6B90 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5AE57A4D2CA8013700A42DE6 /* Project object */;
@@ -51,6 +89,28 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		5A2059052D11E7F3003C850D /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				5A2059362D11E887003C850D /* MySJTULite.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A2059542D11EA0D003C850D /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5A20594F2D11EA0D003C850D /* MySJTULiteWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5A9F0FD12CF35970001A91B1 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -65,6 +125,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5A2059132D11E886003C850D /* MySJTULite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MySJTULite.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A2059222D11E887003C850D /* MySJTULiteTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MySJTULiteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A20592C2D11E887003C850D /* MySJTULiteUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MySJTULiteUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A2059442D11EA0B003C850D /* MySJTULiteWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MySJTULiteWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A7D7FBA2CF490C7001C6B90 /* MySJTUWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MySJTUWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A9F0FBB2CF3596F001A91B1 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
 		5A9F0FBD2CF3596F001A91B1 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
@@ -75,6 +139,49 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5A2059532D11EA0D003C850D /* Exceptions for "MySJTULiteWidget" folder in "MySJTULiteWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5A2059432D11EA0B003C850D /* MySJTULiteWidgetExtension */;
+		};
+		5A2059592D11EC39003C850D /* Exceptions for "MySJTU" folder in "MySJTULite" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Core/Constant.swift,
+				Extension/Date.swift,
+				Extension/UserDefaults.swift,
+				Model/Common.swift,
+				Model/Schedule.swift,
+			);
+			target = 5A2059122D11E886003C850D /* MySJTULite */;
+		};
+		5A20595A2D11EC39003C850D /* Exceptions for "MySJTU" folder in "MySJTULiteWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Core/Constant.swift,
+				Extension/Date.swift,
+				Extension/UserDefaults.swift,
+				Model/Common.swift,
+				Model/Schedule.swift,
+			);
+			target = 5A2059432D11EA0B003C850D /* MySJTULiteWidgetExtension */;
+		};
+		5A2059752D12A4DC003C850D /* Exceptions for "Shared" folder in "MySJTULite" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Connectivity.swift,
+			);
+			target = 5A2059122D11E886003C850D /* MySJTULite */;
+		};
+		5A2059762D12A4DC003C850D /* Exceptions for "Shared" folder in "MySJTULiteWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Connectivity.swift,
+			);
+			target = 5A2059432D11EA0B003C850D /* MySJTULiteWidgetExtension */;
+		};
 		5A7A25E62CE33304003F677F /* Exceptions for "MySJTU" folder in "MySJTU" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -104,6 +211,38 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		5A2059142D11E886003C850D /* MySJTULite */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MySJTULite;
+			sourceTree = "<group>";
+		};
+		5A2059252D11E887003C850D /* MySJTULiteTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MySJTULiteTests;
+			sourceTree = "<group>";
+		};
+		5A20592F2D11E887003C850D /* MySJTULiteUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MySJTULiteUITests;
+			sourceTree = "<group>";
+		};
+		5A2059472D11EA0B003C850D /* MySJTULiteWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5A2059532D11EA0D003C850D /* Exceptions for "MySJTULiteWidget" folder in "MySJTULiteWidgetExtension" target */,
+			);
+			path = MySJTULiteWidget;
+			sourceTree = "<group>";
+		};
+		5A2059712D12A4DC003C850D /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5A2059752D12A4DC003C850D /* Exceptions for "Shared" folder in "MySJTULite" target */,
+				5A2059762D12A4DC003C850D /* Exceptions for "Shared" folder in "MySJTULiteWidgetExtension" target */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		5A7D7FBD2CF490C7001C6B90 /* MySJTUWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -117,6 +256,8 @@
 			exceptions = (
 				5A7A25E62CE33304003F677F /* Exceptions for "MySJTU" folder in "MySJTU" target */,
 				5A7D7FCE2CF4A3C4001C6B90 /* Exceptions for "MySJTU" folder in "MySJTUWidgetExtension" target */,
+				5A2059592D11EC39003C850D /* Exceptions for "MySJTU" folder in "MySJTULite" target */,
+				5A20595A2D11EC39003C850D /* Exceptions for "MySJTU" folder in "MySJTULiteWidgetExtension" target */,
 			);
 			path = MySJTU;
 			sourceTree = "<group>";
@@ -134,6 +275,40 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		5A2059102D11E886003C850D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A2059692D12A395003C850D /* GRDBQuery in Frameworks */,
+				5A2059652D12A37B003C850D /* GRDB in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A20591F2D11E887003C850D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A2059292D11E887003C850D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A2059412D11EA0B003C850D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A2059672D12A38A003C850D /* GRDB in Frameworks */,
+				5A2059462D11EA0B003C850D /* SwiftUI.framework in Frameworks */,
+				5A20596B2D12A39D003C850D /* GRDBQuery in Frameworks */,
+				5A2059452D11EA0B003C850D /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5A7D7FB72CF490C7001C6B90 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -152,6 +327,8 @@
 				5AACB72C2CC401C0003333CA /* SQLite in Frameworks */,
 				5AE261F92CE50F6600412A00 /* AcknowList in Frameworks */,
 				5A7A25D32CE0D795003F677F /* Alamofire in Frameworks */,
+				5A65AB352D0C74F500AE5000 /* Collections in Frameworks */,
+				5A65AB2E2D0C698700AE5000 /* FeedKit in Frameworks */,
 				5AACB7532CC42EA5003333CA /* SwiftUIIntrospect in Frameworks */,
 				5A7A25DC2CE3212E003F677F /* QRCode in Frameworks */,
 				5ADC4A9A2CDA08A300EECE31 /* GRDBQuery in Frameworks */,
@@ -196,9 +373,14 @@
 				5AE57A692CA8013800A42DE6 /* MySJTUTests */,
 				5AE57A732CA8013800A42DE6 /* MySJTUUITests */,
 				5A7D7FBD2CF490C7001C6B90 /* MySJTUWidget */,
+				5A2059142D11E886003C850D /* MySJTULite */,
+				5A2059252D11E887003C850D /* MySJTULiteTests */,
+				5A20592F2D11E887003C850D /* MySJTULiteUITests */,
+				5A2059472D11EA0B003C850D /* MySJTULiteWidget */,
 				5A9F0FBA2CF3596F001A91B1 /* Frameworks */,
 				5AE57A562CA8013700A42DE6 /* Products */,
 				5AE261FA2CE50F7700412A00 /* Package.resolved */,
+				5A2059712D12A4DC003C850D /* Shared */,
 			);
 			sourceTree = "<group>";
 		};
@@ -209,6 +391,10 @@
 				5AE57A662CA8013800A42DE6 /* MySJTUTests.xctest */,
 				5AE57A702CA8013800A42DE6 /* MySJTUUITests.xctest */,
 				5A7D7FBA2CF490C7001C6B90 /* MySJTUWidgetExtension.appex */,
+				5A2059132D11E886003C850D /* MySJTULite.app */,
+				5A2059222D11E887003C850D /* MySJTULiteTests.xctest */,
+				5A20592C2D11E887003C850D /* MySJTULiteUITests.xctest */,
+				5A2059442D11EA0B003C850D /* MySJTULiteWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -216,6 +402,102 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		5A2059122D11E886003C850D /* MySJTULite */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5A2059372D11E887003C850D /* Build configuration list for PBXNativeTarget "MySJTULite" */;
+			buildPhases = (
+				5A20590F2D11E886003C850D /* Sources */,
+				5A2059102D11E886003C850D /* Frameworks */,
+				5A2059112D11E886003C850D /* Resources */,
+				5A2059542D11EA0D003C850D /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5A20594E2D11EA0D003C850D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5A2059142D11E886003C850D /* MySJTULite */,
+			);
+			name = MySJTULite;
+			packageProductDependencies = (
+				5A2059642D12A37B003C850D /* GRDB */,
+				5A2059682D12A395003C850D /* GRDBQuery */,
+			);
+			productName = "MySJTULite Watch App";
+			productReference = 5A2059132D11E886003C850D /* MySJTULite.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5A2059212D11E887003C850D /* MySJTULiteTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5A20593A2D11E887003C850D /* Build configuration list for PBXNativeTarget "MySJTULiteTests" */;
+			buildPhases = (
+				5A20591E2D11E887003C850D /* Sources */,
+				5A20591F2D11E887003C850D /* Frameworks */,
+				5A2059202D11E887003C850D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5A2059242D11E887003C850D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5A2059252D11E887003C850D /* MySJTULiteTests */,
+			);
+			name = MySJTULiteTests;
+			packageProductDependencies = (
+			);
+			productName = "MySJTULite Watch AppTests";
+			productReference = 5A2059222D11E887003C850D /* MySJTULiteTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		5A20592B2D11E887003C850D /* MySJTULiteUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5A20593D2D11E887003C850D /* Build configuration list for PBXNativeTarget "MySJTULiteUITests" */;
+			buildPhases = (
+				5A2059282D11E887003C850D /* Sources */,
+				5A2059292D11E887003C850D /* Frameworks */,
+				5A20592A2D11E887003C850D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5A20592E2D11E887003C850D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5A20592F2D11E887003C850D /* MySJTULiteUITests */,
+			);
+			name = MySJTULiteUITests;
+			packageProductDependencies = (
+			);
+			productName = "MySJTULite Watch AppUITests";
+			productReference = 5A20592C2D11E887003C850D /* MySJTULiteUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		5A2059432D11EA0B003C850D /* MySJTULiteWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5A2059502D11EA0D003C850D /* Build configuration list for PBXNativeTarget "MySJTULiteWidgetExtension" */;
+			buildPhases = (
+				5A2059402D11EA0B003C850D /* Sources */,
+				5A2059412D11EA0B003C850D /* Frameworks */,
+				5A2059422D11EA0B003C850D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5A2059472D11EA0B003C850D /* MySJTULiteWidget */,
+			);
+			name = MySJTULiteWidgetExtension;
+			packageProductDependencies = (
+				5A2059662D12A38A003C850D /* GRDB */,
+				5A20596A2D12A39D003C850D /* GRDBQuery */,
+			);
+			productName = MySJTULiteWidgetExtension;
+			productReference = 5A2059442D11EA0B003C850D /* MySJTULiteWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		5A7D7FB92CF490C7001C6B90 /* MySJTUWidgetExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5A7D7FC92CF490C8001C6B90 /* Build configuration list for PBXNativeTarget "MySJTUWidgetExtension" */;
@@ -248,13 +530,16 @@
 				5AE57A522CA8013700A42DE6 /* Frameworks */,
 				5AE57A532CA8013700A42DE6 /* Resources */,
 				5A9F0FD12CF35970001A91B1 /* Embed Foundation Extensions */,
+				5A2059052D11E7F3003C850D /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				5A7D7FC72CF490C8001C6B90 /* PBXTargetDependency */,
+				5A2059352D11E887003C850D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				5A2059712D12A4DC003C850D /* Shared */,
 				5AE57A572CA8013700A42DE6 /* MySJTU */,
 			);
 			name = MySJTU;
@@ -270,6 +555,8 @@
 				5ABA499B2CEE5F5D00EDDC75 /* SwiftSoup */,
 				5A9F0F092CF1C383001A91B1 /* Apollo */,
 				5A4117A02CF5E87800AC0B8A /* SwiftyCrop */,
+				5A65AB2D2D0C698700AE5000 /* FeedKit */,
+				5A65AB342D0C74F500AE5000 /* Collections */,
 			);
 			productName = MySJTU;
 			productReference = 5AE57A552CA8013700A42DE6 /* MySJTU.app */;
@@ -328,9 +615,23 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1610;
+				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					5A2059122D11E886003C850D = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					5A2059212D11E887003C850D = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = 5A2059122D11E886003C850D;
+					};
+					5A20592B2D11E887003C850D = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = 5A2059122D11E886003C850D;
+					};
+					5A2059432D11EA0B003C850D = {
+						CreatedOnToolsVersion = 16.2;
+					};
 					5A7D7FB92CF490C7001C6B90 = {
 						CreatedOnToolsVersion = 16.1;
 					};
@@ -369,6 +670,8 @@
 				5ABA499A2CEE5F5D00EDDC75 /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 				5A9F0F082CF1C383001A91B1 /* XCRemoteSwiftPackageReference "apollo-ios" */,
 				5A41179F2CF5E87800AC0B8A /* XCRemoteSwiftPackageReference "SwiftyCrop" */,
+				5A65AB2C2D0C698700AE5000 /* XCRemoteSwiftPackageReference "FeedKit" */,
+				5A65AB332D0C74F500AE5000 /* XCRemoteSwiftPackageReference "swift-collections" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5AE57A562CA8013700A42DE6 /* Products */;
@@ -379,11 +682,43 @@
 				5AE57A652CA8013800A42DE6 /* MySJTUTests */,
 				5AE57A6F2CA8013800A42DE6 /* MySJTUUITests */,
 				5A7D7FB92CF490C7001C6B90 /* MySJTUWidgetExtension */,
+				5A2059122D11E886003C850D /* MySJTULite */,
+				5A2059212D11E887003C850D /* MySJTULiteTests */,
+				5A20592B2D11E887003C850D /* MySJTULiteUITests */,
+				5A2059432D11EA0B003C850D /* MySJTULiteWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		5A2059112D11E886003C850D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A2059202D11E887003C850D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A20592A2D11E887003C850D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A2059422D11EA0B003C850D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5A7D7FB82CF490C7001C6B90 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -416,6 +751,34 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		5A20590F2D11E886003C850D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A20591E2D11E887003C850D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A2059282D11E887003C850D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A2059402D11EA0B003C850D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5A7D7FB62CF490C7001C6B90 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -447,6 +810,26 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		5A2059242D11E887003C850D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5A2059122D11E886003C850D /* MySJTULite */;
+			targetProxy = 5A2059232D11E887003C850D /* PBXContainerItemProxy */;
+		};
+		5A20592E2D11E887003C850D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5A2059122D11E886003C850D /* MySJTULite */;
+			targetProxy = 5A20592D2D11E887003C850D /* PBXContainerItemProxy */;
+		};
+		5A2059352D11E887003C850D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5A2059122D11E886003C850D /* MySJTULite */;
+			targetProxy = 5A2059342D11E887003C850D /* PBXContainerItemProxy */;
+		};
+		5A20594E2D11EA0D003C850D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5A2059432D11EA0B003C850D /* MySJTULiteWidgetExtension */;
+			targetProxy = 5A20594D2D11EA0D003C850D /* PBXContainerItemProxy */;
+		};
 		5A7D7FC72CF490C8001C6B90 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 5A7D7FB92CF490C7001C6B90 /* MySJTUWidgetExtension */;
@@ -465,6 +848,214 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		5A2059382D11E887003C850D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MySJTULite/MySJTULite.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 115;
+				DEVELOPMENT_ASSET_PATHS = "\"MySJTULite/Preview Content\"";
+				DEVELOPMENT_TEAM = HK6N26354D;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = MySJTULite;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.boar.sjct;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.boar.sjct.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Debug;
+		};
+		5A2059392D11E887003C850D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MySJTULite/MySJTULite.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 115;
+				DEVELOPMENT_ASSET_PATHS = "\"MySJTULite/Preview Content\"";
+				DEVELOPMENT_TEAM = HK6N26354D;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = MySJTULite;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.boar.sjct;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.boar.sjct.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Release;
+		};
+		5A20593B2D11E887003C850D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 115;
+				DEVELOPMENT_TEAM = HK6N26354D;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.boar.MySJTULite-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MySJTULite Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MySJTULite Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Debug;
+		};
+		5A20593C2D11E887003C850D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 115;
+				DEVELOPMENT_TEAM = HK6N26354D;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.boar.MySJTULite-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MySJTULite Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MySJTULite Watch App";
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Release;
+		};
+		5A20593E2D11E887003C850D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 115;
+				DEVELOPMENT_TEAM = HK6N26354D;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.boar.MySJTULite-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "MySJTULite Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Debug;
+		};
+		5A20593F2D11E887003C850D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 115;
+				DEVELOPMENT_TEAM = HK6N26354D;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.boar.MySJTULite-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "MySJTULite Watch App";
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Release;
+		};
+		5A2059512D11EA0D003C850D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 115;
+				DEVELOPMENT_TEAM = HK6N26354D;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MySJTULiteWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MySJTULiteWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.boar.sjct.watchkitapp.MySJTULiteWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Debug;
+		};
+		5A2059522D11EA0D003C850D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 115;
+				DEVELOPMENT_TEAM = HK6N26354D;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MySJTULiteWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MySJTULiteWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.boar.sjct.watchkitapp.MySJTULiteWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Release;
+		};
 		5A7D7FCA2CF490C8001C6B90 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -473,7 +1064,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTUWidget/MySJTUWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 108;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -513,7 +1104,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTUWidget/MySJTUWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 108;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -671,7 +1262,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTU/MySJTU.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 108;
+				CURRENT_PROJECT_VERSION = 115;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MySJTU/Preview Content\"";
 				DEVELOPMENT_TEAM = HK6N26354D;
@@ -724,7 +1315,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTU/MySJTU.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 108;
+				CURRENT_PROJECT_VERSION = 115;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MySJTU/Preview Content\"";
 				DEVELOPMENT_TEAM = HK6N26354D;
@@ -770,7 +1361,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 108;
+				CURRENT_PROJECT_VERSION = 115;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -794,7 +1385,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 108;
+				CURRENT_PROJECT_VERSION = 115;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -817,7 +1408,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 108;
+				CURRENT_PROJECT_VERSION = 115;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -840,7 +1431,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 108;
+				CURRENT_PROJECT_VERSION = 115;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -862,6 +1453,42 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		5A2059372D11E887003C850D /* Build configuration list for PBXNativeTarget "MySJTULite" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A2059382D11E887003C850D /* Debug */,
+				5A2059392D11E887003C850D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5A20593A2D11E887003C850D /* Build configuration list for PBXNativeTarget "MySJTULiteTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A20593B2D11E887003C850D /* Debug */,
+				5A20593C2D11E887003C850D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5A20593D2D11E887003C850D /* Build configuration list for PBXNativeTarget "MySJTULiteUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A20593E2D11E887003C850D /* Debug */,
+				5A20593F2D11E887003C850D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5A2059502D11EA0D003C850D /* Build configuration list for PBXNativeTarget "MySJTULiteWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A2059512D11EA0D003C850D /* Debug */,
+				5A2059522D11EA0D003C850D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		5A7D7FC92CF490C8001C6B90 /* Build configuration list for PBXNativeTarget "MySJTUWidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -916,6 +1543,22 @@
 			requirement = {
 				branch = master;
 				kind = branch;
+			};
+		};
+		5A65AB2C2D0C698700AE5000 /* XCRemoteSwiftPackageReference "FeedKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/nmdias/FeedKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.1.2;
+			};
+		};
+		5A65AB332D0C74F500AE5000 /* XCRemoteSwiftPackageReference "swift-collections" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-collections.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.4;
 			};
 		};
 		5A7A25CB2CE09560003F677F /* XCRemoteSwiftPackageReference "lottie-spm" */ = {
@@ -1001,10 +1644,40 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		5A2059642D12A37B003C850D /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5ADC4A902CDA01BD00EECE31 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		5A2059662D12A38A003C850D /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5ADC4A902CDA01BD00EECE31 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		5A2059682D12A395003C850D /* GRDBQuery */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5ADC4A982CDA08A300EECE31 /* XCRemoteSwiftPackageReference "GRDBQuery" */;
+			productName = GRDBQuery;
+		};
+		5A20596A2D12A39D003C850D /* GRDBQuery */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5ADC4A982CDA08A300EECE31 /* XCRemoteSwiftPackageReference "GRDBQuery" */;
+			productName = GRDBQuery;
+		};
 		5A4117A02CF5E87800AC0B8A /* SwiftyCrop */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 5A41179F2CF5E87800AC0B8A /* XCRemoteSwiftPackageReference "SwiftyCrop" */;
 			productName = SwiftyCrop;
+		};
+		5A65AB2D2D0C698700AE5000 /* FeedKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A65AB2C2D0C698700AE5000 /* XCRemoteSwiftPackageReference "FeedKit" */;
+			productName = FeedKit;
+		};
+		5A65AB342D0C74F500AE5000 /* Collections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A65AB332D0C74F500AE5000 /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = Collections;
 		};
 		5A7A25CC2CE09560003F677F /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;

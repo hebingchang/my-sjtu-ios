@@ -51,3 +51,53 @@ query getClassAssignments($classId: ID!) {
     }
   }
 }
+
+query getAssignment($assignmentId: ID!) {
+  assignment(id: $assignmentId) {
+    submissionsConnection {
+      nodes {
+        attempt
+        readState
+        score
+        gradingStatus
+      }
+    }
+    course {
+      id
+      name
+    }
+    id
+    pointsPossible
+    name
+    state
+    dueAt
+    htmlUrl
+  }
+}
+
+query getAssignmentDetail($assignmentId: ID!) {
+  assignment(id: $assignmentId) {
+    course {
+      id
+      name
+    }
+    description
+    dueAt
+    htmlUrl
+    id
+    pointsPossible
+    name
+    submissionTypes
+    allowedExtensions
+    submissionsConnection {
+      nodes {
+        id
+        attempt
+        readState
+        score
+        gradingStatus
+        createdAt
+      }
+    }
+  }
+}

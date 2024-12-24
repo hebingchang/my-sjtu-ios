@@ -13,15 +13,17 @@ struct CanvasLinkView: View {
     @AppStorage("accounts") var accounts: [WebAuthAccount] = []
     @Environment(\.dismiss) var dismiss
 
-    @State private var status: CanvasLinkStatus = .iCloudLoading
+    @State private var status: CanvasLinkStatus = .initializing
     @State private var loading: Bool = true
-    @State private var buttonLoading: Bool = false
+    @State private var primaryButtonLoading: Bool = false
+    @State private var secondaryButtonLoading: Bool = false
     @State private var showErrorAlert: Bool = false
     @State private var errorMessage: String = ""
 
     private enum CanvasLinkStatus {
-        case iCloudLoading, iCloudHasToken, iCloudImporting
-        case tokenLoading, beforeCreateToken, tokenExists, tokenCreating
+        case initializing
+        case iCloudHasToken
+        case beforeCreateToken, tokenExists
         case createFinished, importFinished
         case internalError
     }
@@ -164,16 +166,15 @@ struct CanvasLinkView: View {
             
             VStack(spacing: 16) {
                 switch status {
-                case .iCloudHasToken, .iCloudImporting:
+                case .iCloudHasToken:
                     Button {
-                        buttonLoading = true
-                        status = .iCloudImporting
+                        primaryButtonLoading = true
                         Task {
                             try await importTokenFromiCloud()
-                            buttonLoading = false
+                            primaryButtonLoading = false
                         }
                     } label: {
-                        if buttonLoading && status == .iCloudImporting {
+                        if primaryButtonLoading {
                             ProgressView()
                                 .frame(maxWidth: .infinity)
                                 .padding([.top, .bottom], 6)
@@ -184,31 +185,29 @@ struct CanvasLinkView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(buttonLoading)
+                    .disabled(primaryButtonLoading || secondaryButtonLoading)
                     
                     Button {
-                        buttonLoading = true
+                        secondaryButtonLoading = true
                         loading = true
-                        status = .tokenLoading
                         Task {
                             try await getExistingToken()
-                            buttonLoading = false
+                            secondaryButtonLoading = false
                             loading = false
                         }
                     } label: {
                         Text("创建新令牌")
                     }
-                    .disabled(buttonLoading)
-                case .tokenExists, .beforeCreateToken, .tokenCreating:
+                    .disabled(primaryButtonLoading || secondaryButtonLoading)
+                case .tokenExists, .beforeCreateToken:
                     Button {
-                        buttonLoading = true
-                        status = .tokenCreating
+                        primaryButtonLoading = true
                         Task {
                             try await createCanvasToken()
-                            buttonLoading = false
+                            primaryButtonLoading = false
                         }
                     } label: {
-                        if buttonLoading && status == .tokenCreating {
+                        if primaryButtonLoading {
                             ProgressView()
                                 .frame(maxWidth: .infinity)
                                 .padding([.top, .bottom], 6)
@@ -219,14 +218,14 @@ struct CanvasLinkView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(buttonLoading)
+                    .disabled(primaryButtonLoading || secondaryButtonLoading)
                     
                     Button {
                         dismiss()
                     } label: {
                         Text("取消")
                     }
-                    .disabled(buttonLoading)
+                    .disabled(primaryButtonLoading || secondaryButtonLoading)
                 case .importFinished, .createFinished, .internalError:
                     Button {
                         dismiss()
@@ -240,9 +239,11 @@ struct CanvasLinkView: View {
                     Text("")
                 }
             }
+            .padding()
         }
         .animation(.easeInOut, value: status)
         .animation(.easeInOut, value: loading)
+        .frame(maxWidth: .infinity)
         .padding()
         .task {
             guard let account = (accounts.first {
@@ -256,16 +257,33 @@ struct CanvasLinkView: View {
                 do {
                     try await checkCanvasToken(token: iCloudToken)
                     status = .iCloudHasToken
+                    loading = false
                 } catch APIError.sessionExpired {
-                    status = .tokenLoading
+                    Task {
+                        try await getExistingToken()
+                        loading = false
+                    }
                 } catch {
                     errorMessage = "内部错误，请稍后重试"
                     status = .internalError
                 }
             } else {
-                status = .tokenLoading
+                Task {
+                    do {
+                        try await getExistingToken()
+                        loading = false
+                    } catch {
+                        if let apiError = error as? APIError, apiError == .noAccount {
+                            errorMessage = "您的 jAccount 没有有效的 Canvas 账户"
+                            status = .internalError
+                        } else {
+                            errorMessage = "内部错误，请稍后重试"
+                            status = .internalError
+                        }
+                        loading = false
+                    }
+                }
             }
-            loading = false
         }
         .alert("错误", isPresented: $showErrorAlert) {
         } message: {
@@ -410,7 +428,7 @@ struct AccountView: View {
                                     .foregroundStyle(Color(UIColor.label))
                                 Spacer()
                                 HStack(spacing: 2) {
-                                    Image(systemName: "exclamationmark.triangle")
+                                    Image(systemName: "exclamationmark.triangle.fill")
                                         .foregroundColor(.orange)
                                     Text("会话已过期")
                                         .font(.callout)
@@ -497,6 +515,24 @@ struct AccountView: View {
                                                             presentError = true
                                                         }
                                                         featureLoading[.unicode] = false
+                                                    }
+                                                case .campus_card:
+                                                    featureLoading[.campus_card] = true
+                                                    Task {
+                                                        do {
+                                                            let api = SJTUOpenAPI(tokens: accounts[index].tokens)
+                                                            let cards = try await api.getCampusCards()
+                                                            if cards.count == 0 {
+                                                                featureError = "当前 jAccount 没有关联的校园卡"
+                                                                presentError = true
+                                                            } else {
+                                                                accounts[index].enabledFeatures.append(feature.feature)
+                                                            }
+                                                        } catch {
+                                                            featureError = "获取校园卡信息时发生错误"
+                                                            presentError = true
+                                                        }
+                                                        featureLoading[.campus_card] = false
                                                     }
                                                 default:
                                                     accounts[index].enabledFeatures.append(feature.feature)

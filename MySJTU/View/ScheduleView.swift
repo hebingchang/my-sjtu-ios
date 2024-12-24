@@ -84,8 +84,12 @@ struct ScheduleViewTitle: View {
 
     var selectedDay: Date
     var college: College
+    var showBothCollege: Bool
+    @Binding var activeCustomSchedule: CustomSchedule?
+
     @AppStorage("accounts") var accounts: [WebAuthAccount] = []
     @State private var showAlert = false
+    @State private var showCustomScheduleSheet = false
     @State private var presentAccountPage = false
     @State private var alertError: ImportError?
     
@@ -133,146 +137,165 @@ struct ScheduleViewTitle: View {
                                 print(error)
                             }
                         }
-                    } else if college == .sjtu {
-                        Button("从教学信息服务网导入", systemImage: "square.and.arrow.down") {
-                            let account = accounts.first {
-                                $0.provider == .jaccount
-                            }
-                            
-                            if let account {
-                                do {
-                                    let semester = try Eloquent.getSemester(college: college, date: selectedDay)
-                                    if let semester {
-                                        Task {
-                                            do {
-                                                progressor.progress = Progress(description: "正在初始化", value: 0)
-                                                let api = SJTUOpenAPI(tokens: account.tokens)
-                                                progressor.progress = Progress(description: "正在同步日程", value: 0.1)
-                                                let schedules = try await api.getSchedules(semester: semester)
-                                                progressor.progress = Progress(description: "正在导入日程", value: 0.6)
-                                                try await Eloquent.insertSchedules(semester: semester, college: college, schedules: schedules, deleteExisting: true)
-                                                 WidgetCenter.shared.reloadAllTimelines()
-                                                progressor.progress = Progress(description: "导入日程完成", value: 1)
-                                            } catch {
-                                                progressor.progress = Progress(description: "导入日程失败", value: -1)
+                    } else {
+                        if college == .sjtu {
+                            Button("从教学信息服务网导入", systemImage: "square.and.arrow.down") {
+                                let account = accounts.first {
+                                    $0.provider == .jaccount
+                                }
+                                
+                                if let account {
+                                    do {
+                                        let semester = try Eloquent.getSemester(college: .sjtu, date: selectedDay)
+                                        if let semester {
+                                            Task {
+                                                do {
+                                                    progressor.progress = Progress(description: "正在初始化", value: 0)
+                                                    let api = SJTUOpenAPI(tokens: account.tokens)
+                                                    progressor.progress = Progress(description: "正在同步日程", value: 0.1)
+                                                    let schedules = try await api.getSchedules(semester: semester)
+                                                    progressor.progress = Progress(description: "正在导入日程", value: 0.6)
+                                                    try await Eloquent.insertSchedules(semester: semester, college: .sjtu, schedules: schedules, deleteExisting: true)
+                                                    WidgetCenter.shared.reloadAllTimelines()
+                                                    progressor.progress = Progress(description: "导入日程完成", value: 1)
+                                                } catch {
+                                                    progressor.progress = Progress(description: "导入日程失败", value: -1)
+                                                }
                                             }
+                                        } else {
+                                            alertError = .invalidSemester
+                                            showAlert.toggle()
                                         }
-                                    } else {
-                                        alertError = .invalidSemester
+                                    } catch {
+                                        alertError = .internalError
                                         showAlert.toggle()
                                     }
-                                } catch {
-                                    alertError = .internalError
+                                } else {
+                                    alertError = .invalidAccount
                                     showAlert.toggle()
                                 }
-                            } else {
-                                alertError = .invalidAccount
-                                showAlert.toggle()
                             }
                         }
-                    } else if college == .sjtug {
-                        Button("从研究生选课系统导入", systemImage: "square.and.arrow.down") {
-                            let account = accounts.first {
-                                $0.provider == .jaccount
-                            }
-                            
-                            if let account {
-                                do {
-                                    let semester = try Eloquent.getSemester(college: college, date: selectedDay)
-                                    if let semester {
-                                        Task {
-                                            do {
-                                                progressor.progress = Progress(description: "正在初始化", value: 0)
-                                                let api = SJTUGOpenAPI(cookies: account.cookies.map { cookie in
-                                                    cookie.httpCookie!
-                                                })
-                                                progressor.progress = Progress(description: "正在同步日程", value: 0.1)
-                                                let schedules = try await api.getSchedules(semester: semester)
-                                                progressor.progress = Progress(description: "正在导入日程", value: 0.6)
-                                                try await Eloquent.insertSchedules(semester: semester, college: college, schedules: schedules, deleteExisting: true)
-                                                WidgetCenter.shared.reloadAllTimelines()
-                                                progressor.progress = Progress(description: "导入日程完成", value: 1)
-                                            } catch {
-                                                print(error)
-                                                progressor.progress = Progress(description: "导入日程失败", value: -1)
+                        
+                        if college == .sjtug || (college == .sjtu && showBothCollege) {
+                            Button("从研究生选课系统导入", systemImage: "square.and.arrow.down") {
+                                let account = accounts.first {
+                                    $0.provider == .jaccount
+                                }
+                                
+                                if let account {
+                                    do {
+                                        let semester = try Eloquent.getSemester(college: .sjtug, date: selectedDay)
+                                        if let semester {
+                                            Task {
+                                                do {
+                                                    progressor.progress = Progress(description: "正在初始化", value: 0)
+                                                    let api = SJTUGOpenAPI(cookies: account.cookies.map { cookie in
+                                                        cookie.httpCookie!
+                                                    })
+                                                    progressor.progress = Progress(description: "正在同步日程", value: 0.1)
+                                                    let schedules = try await api.getSchedules(semester: semester)
+                                                    progressor.progress = Progress(description: "正在导入日程", value: 0.6)
+                                                    try await Eloquent.insertSchedules(semester: semester, college: .sjtug, schedules: schedules, deleteExisting: true)
+                                                    WidgetCenter.shared.reloadAllTimelines()
+                                                    progressor.progress = Progress(description: "导入日程完成", value: 1)
+                                                } catch {
+                                                    print(error)
+                                                    progressor.progress = Progress(description: "导入日程失败", value: -1)
+                                                }
                                             }
+                                        } else {
+                                            alertError = .invalidSemester
+                                            showAlert.toggle()
                                         }
-                                    } else {
-                                        alertError = .invalidSemester
+                                    } catch {
+                                        alertError = .internalError
                                         showAlert.toggle()
                                     }
-                                } catch {
-                                    alertError = .internalError
+                                } else {
+                                    alertError = .invalidAccount
                                     showAlert.toggle()
                                 }
-                            } else {
-                                alertError = .invalidAccount
-                                showAlert.toggle()
                             }
                         }
-                    } else if college == .shsmu {
-                        Button("从医学院教务系统导入", systemImage: "square.and.arrow.down") {
-                            let account = accounts.first {
-                                $0.provider == .shsmu
-                            }
-                            
-                            if let account {
-                                do {
-                                    let semester = try Eloquent.getSemester(college: college, date: selectedDay)
-                                    if let semester {
-                                        Task {
-                                            do {
-                                                progressor.progress = Progress(description: "正在初始化", value: 0)
-                                                let api = SHSMUOpenAPI(cookies: account.cookies.map { cookie in
-                                                    cookie.httpCookie!
-                                                })
-                                                progressor.progress = Progress(description: "正在检查会话", value: 0.1)
-                                                let status = try await account.checkSession()
-                                                if status == .expired {
-                                                    progressor.progress = Progress(description: "会话已过期", value: -1)
-                                                    try await Task.sleep(for: .seconds(2))
-                                                    alertError = .sessionExpired
-                                                    showAlert.toggle()
-                                                    return
+                        
+                        if college == .shsmu {
+                            Button("从医学院教务系统导入", systemImage: "square.and.arrow.down") {
+                                let account = accounts.first {
+                                    $0.provider == .shsmu
+                                }
+                                
+                                if let account {
+                                    do {
+                                        let semester = try Eloquent.getSemester(college: college, date: selectedDay)
+                                        if let semester {
+                                            Task {
+                                                do {
+                                                    progressor.progress = Progress(description: "正在初始化", value: 0)
+                                                    let api = SHSMUOpenAPI(cookies: account.cookies.map { cookie in
+                                                        cookie.httpCookie!
+                                                    })
+                                                    progressor.progress = Progress(description: "正在检查会话", value: 0.1)
+                                                    let status = try await account.checkSession()
+                                                    if status == .expired {
+                                                        progressor.progress = Progress(description: "会话已过期", value: -1)
+                                                        try await Task.sleep(for: .seconds(2))
+                                                        alertError = .sessionExpired
+                                                        showAlert.toggle()
+                                                        return
+                                                    }
+                                                    
+                                                    progressor.progress = Progress(description: "正在同步日程", value: 0.2)
+                                                    let schedules = try await api.getSchedules(semester: semester) { progress in
+                                                        DispatchQueue.main.async {
+                                                            progressor.progress = Progress(description: "正在获取日程信息 \(Int(progress * 100))%", value: 0.4 + (0.8 - 0.4) * Float(progress))
+                                                        }
+                                                    }
+                                                                                                        
+                                                    progressor.progress = Progress(description: "正在导入日程", value: 0.8)
+                                                    try await Eloquent.insertSchedules(semester: semester, college: college, schedules: schedules, deleteExisting: true)
+                                                    WidgetCenter.shared.reloadAllTimelines()
+                                                    progressor.progress = Progress(description: "导入日程完成", value: 1)
+                                                } catch {
+                                                    print(error)
+                                                    progressor.progress = Progress(description: "导入日程失败", value: -1)
                                                 }
-                                                
-                                                progressor.progress = Progress(description: "正在同步日程", value: 0.2)
-                                                let bizSchedules = try await api.getSchedules(semester: semester)
-                                                var schedules: [CourseClassSchedule] = []
-                                                for (index, schedule) in bizSchedules.enumerated() {
-                                                    progressor.progress = Progress(description: "正在获取课程信息 \(index+1)/\(bizSchedules.count)", value: 0.4 + (0.8 - 0.4) * Float(index) / Float(bizSchedules.count))
-                                                    schedules.append(try await api.getCourseInfo(schedule: schedule))
-                                                }
-                                                progressor.progress = Progress(description: "正在导入日程", value: 0.8)
-                                                try await Eloquent.insertSchedules(semester: semester, college: college, schedules: schedules, deleteExisting: true)
-                                                WidgetCenter.shared.reloadAllTimelines()
-                                                progressor.progress = Progress(description: "导入日程完成", value: 1)
-                                            } catch {
-                                                print(error)
-                                                progressor.progress = Progress(description: "导入日程失败", value: -1)
                                             }
+                                        } else {
+                                            alertError = .invalidSemester
+                                            showAlert.toggle()
                                         }
-                                    } else {
-                                        alertError = .invalidSemester
+                                    } catch {
+                                        alertError = .internalError
                                         showAlert.toggle()
                                     }
-                                } catch {
-                                    alertError = .internalError
+                                } else {
+                                    alertError = .invalidAccount
                                     showAlert.toggle()
                                 }
-                            } else {
-                                alertError = .invalidAccount
-                                showAlert.toggle()
                             }
                         }
                     }
                     Button("添加自定义日程", systemImage: "plus") {
-                        alertError = .todo
-                        showAlert.toggle()
+                        showCustomScheduleSheet = true
                     }
                 } label: {
                     Image(systemName: "plus")
                         .font(.title2)
+                }
+                .onChange(of: activeCustomSchedule) {
+                    if activeCustomSchedule != nil {
+                        showCustomScheduleSheet = true
+                    }
+                }
+                .sheet(isPresented: $showCustomScheduleSheet, onDismiss: {
+                    activeCustomSchedule = nil
+                }) {
+                    NavigationStack {
+                        CustomScheduleEditorView(customSchedule: activeCustomSchedule)
+                            .navigationTitle(activeCustomSchedule == nil ? "添加自定义日程" : activeCustomSchedule!.name)
+                            .navigationBarTitleDisplayMode(.inline)
+                    }
                 }
                 .sheet(isPresented: $presentAccountPage) {
                     NavigationStack {
@@ -389,19 +412,23 @@ struct WeekTabView: View {
 
 struct DayView: View {
     let day: Date
-    let college: College
+    let colleges: [College]
     let onScheduleTouch: (ScheduleInfo) -> Void
-    
+    let onCustomScheduleTouch: (CustomSchedule) -> Void
+
     @Query<SchedulesRequest> private var schedules: [ScheduleInfo]
+    @Query<CustomSchedulesRequest> private var customSchedules: [CustomSchedule]
     @Environment(\.colorScheme) var colorScheme: ColorScheme
     @State private var nowPosition: CGFloat?
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    init(day: Date, college: College, onScheduleTouch: @escaping (ScheduleInfo) -> Void) {
+    init(day: Date, colleges: [College], onScheduleTouch: @escaping (ScheduleInfo) -> Void, onCustomScheduleTouch: @escaping (CustomSchedule) -> Void) {
         self.day = day
-        self.college = college
+        self.colleges = colleges
         self.onScheduleTouch = onScheduleTouch
-        _schedules = Query(constant: SchedulesRequest(college: college, date: day))
+        self.onCustomScheduleTouch = onCustomScheduleTouch
+        _schedules = Query(constant: SchedulesRequest(colleges: colleges, date: day))
+        _customSchedules = Query(constant: CustomSchedulesRequest(colleges: colleges, date: day))
     }
 
     func updateCurrentTime() {
@@ -409,7 +436,7 @@ struct DayView: View {
             let formatter = DateFormatter()
             formatter.dateFormat = "HH:mm"
 
-            let timeTable = CollegeTimeTable[college, default: []]
+            let timeTable = CollegeTimeTable[colleges.first!, default: []]
             let (start, finish) = timeTable.getHours()
             let now = Date.now
 
@@ -435,7 +462,7 @@ struct DayView: View {
         let verticalDividerOffset: CGFloat = 12.6
 
         HStack(spacing: 8) {
-            let timeTable = CollegeTimeTable[college, default: []]
+            let timeTable = CollegeTimeTable[colleges.first!, default: []]
             let (start, finish) = timeTable.getHours()
 
             VStack(alignment: .trailing, spacing: hourSpacing) {
@@ -468,7 +495,83 @@ struct DayView: View {
                     .position(x: verticalDividerOffset, y: (hourHeight + dividerThickness + containerHeight) / 2)
                 
                 ZStack(alignment: .top) {
-                    ForEach(schedules, id: \.schedule.period) { info in
+                    ForEach(customSchedules, id: \.id) { info in
+                        GeometryReader { geometry in
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color(hex: info.color ?? "#5D737E", opacity: 0.1), lineWidth: 1)
+                            .fill(colorScheme == .light ? Color.white : Color.black)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color(hex: info.color ?? "#5D737E", opacity: colorScheme == .light ? 0.2 : 0.6))
+                                .overlay(alignment: .topLeading) {
+                                    if info.height() * containerHeight < 60 {
+                                        VStack(alignment: .leading) {
+                                            Text(info.name)
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                        }
+                                        .padding([.leading, .trailing], 12)
+                                        .frame(maxHeight: .infinity)
+                                    } else {
+                                        VStack(alignment: .leading) {
+                                            Text(info.name)
+                                                .font(.headline)
+                                            Spacer()
+                                            Text("\(info.begin.formatted(format: "H:mm")) - \(info.end.formatted(format: "H:mm"))・\(info.location)")
+                                                .font(.subheadline)
+                                                .foregroundColor(Color(UIColor.secondaryLabel))
+                                        }
+                                        .padding([.leading, .trailing], 12)
+                                        .padding([.top, .bottom], 10)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .contextMenu {
+                                    Button {
+                                        onCustomScheduleTouch(info)
+                                    } label: {
+                                        Label("编辑", systemImage: "square.and.pencil")
+                                    }
+                                    Button(role: .destructive) {
+                                        if let id = info.id {
+                                            Task {
+                                                do {
+                                                    try await Eloquent.deleteCustomSchedule(id: id)
+                                                    WidgetCenter.shared.reloadAllTimelines()
+                                                } catch {
+                                                    print(error)
+                                                }
+                                            }
+                                        }
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
+                                    }
+                                } preview: {
+                                    VStack(alignment: .leading) {
+                                        Text(info.name)
+                                            .font(.headline)
+                                        Text("\(info.begin.formatted(format: "H:mm")) - \(info.end.formatted(format: "H:mm"))・\(info.location)")
+                                            .font(.subheadline)
+                                            .foregroundColor(Color(UIColor.secondaryLabel))
+                                    }
+                                    .padding([.leading, .trailing], 12)
+                                    .padding([.top, .bottom], 10)
+                                    .background {
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Color(hex: info.color ?? "#5D737E", opacity: colorScheme == .light ? 0.2 : 0.6))
+                                    }
+                                }
+                            }
+                            .frame(height: info.height() * containerHeight)
+                            .position(x: geometry.size.width / 2, y: info.y() * containerHeight)
+                            .onTapGesture {
+                                onCustomScheduleTouch(info)
+                            }
+                        }
+                        .padding([.leading, .trailing], 2)
+                    }
+                    
+                    ForEach(schedules, id: \.id) { info in
                         GeometryReader { geometry in
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .stroke(Color(hex: info.class_.color, opacity: 0.1), lineWidth: 1)
@@ -614,21 +717,25 @@ struct DashedVerticalLine: Shape {
 
 struct WeekScheduleView: View {
     let day: Date
-    let college: College
+    let colleges: [College]
     let onScheduleTouch: (ScheduleInfo) -> Void
-    
+    let onCustomScheduleTouch: (CustomSchedule) -> Void
+
     @Query<SchedulesRequest> private var schedules: [ScheduleInfo]
+    @Query<CustomSchedulesRequest> private var customSchedules: [CustomSchedule]
     @Environment(\.colorScheme) var colorScheme: ColorScheme
 
-    init(day: Date, college: College, onScheduleTouch: @escaping (ScheduleInfo) -> Void) {
+    init(day: Date, colleges: [College], onScheduleTouch: @escaping (ScheduleInfo) -> Void, onCustomScheduleTouch: @escaping (CustomSchedule) -> Void) {
         self.day = day
-        self.college = college
+        self.colleges = colleges
         self.onScheduleTouch = onScheduleTouch
-        _schedules = Query(constant: SchedulesRequest(college: college, date: day, isWeek: true))
+        self.onCustomScheduleTouch = onCustomScheduleTouch
+        _schedules = Query(constant: SchedulesRequest(colleges: colleges, date: day, isWeek: true))
+        _customSchedules = Query(constant: CustomSchedulesRequest(colleges: colleges, date: day, isWeek: true))
     }
 
     var body: some View {
-        let timeSlots = CollegeTimeTable[college]!
+        let timeSlots = CollegeTimeTable[colleges.first!]!
         let dividerThickness: CGFloat = 1
 
         ZStack(alignment: .top) {
@@ -656,8 +763,12 @@ struct WeekScheduleView: View {
                         let daySchedules = schedules.filter {
                             $0.schedule.day == weekday
                         }
+                        
+                        let dayCustomSchedules = customSchedules.filter {
+                            $0.begin.get(.weekday) == (weekday + 1) % 7 + 1
+                        }
 
-                        ForEach(daySchedules, id: \.schedule.period) { info in
+                        ForEach(daySchedules, id: \.id) { info in
                             GeometryReader { geometry in
                                 let height: CGFloat = CGFloat(info.schedule.length) * timeSlotHeight + CGFloat(info.schedule.length - 1) * dividerThickness - 4
                                 let y: CGFloat = CGFloat(info.schedule.period) * timeSlotHeight + max(0, CGFloat(info.schedule.period) - 1) * dividerThickness
@@ -713,6 +824,77 @@ struct WeekScheduleView: View {
                             }
                             .padding(2)
                         }
+                        
+                        ForEach(dayCustomSchedules, id: \.id) { info in
+                            GeometryReader { geometry in
+                                let height: CGFloat = CGFloat(info.length()) * timeSlotHeight + CGFloat(info.length() - 1) * dividerThickness - 4
+                                let y: CGFloat = CGFloat(info.period()) * timeSlotHeight + max(0, CGFloat(info.period()) - 1) * dividerThickness
+                                
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color(hex: info.color ?? "#5D737E", opacity: 0.1), lineWidth: 1)
+                                .fill(colorScheme == .light ? Color.white : Color.black)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color(hex: info.color ?? "#5D737E", opacity: colorScheme == .light ? 0.2 : 0.6))
+                                    .overlay(alignment: .topLeading) {
+                                        VStack(alignment: .leading) {
+                                            Text(info.name)
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                            Spacer()
+                                            Text(info.location)
+                                                .font(.caption2)
+                                                .foregroundColor(Color(UIColor.secondaryLabel))
+                                        }
+                                        .padding([.leading, .trailing], 4)
+                                        .padding([.top, .bottom], 5)
+                                    }
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .contextMenu {
+                                        Button {
+                                            onCustomScheduleTouch(info)
+                                        } label: {
+                                            Label("编辑", systemImage: "square.and.pencil")
+                                        }
+                                        Button(role: .destructive) {
+                                            if let id = info.id {
+                                                Task {
+                                                    do {
+                                                        try await Eloquent.deleteCustomSchedule(id: id)
+                                                        WidgetCenter.shared.reloadAllTimelines()
+                                                    } catch {
+                                                        print(error)
+                                                    }
+                                                }
+                                            }
+                                        } label: {
+                                            Label("删除", systemImage: "trash")
+                                        }
+                                    } preview: {
+                                        VStack(alignment: .leading) {
+                                            Text(info.name)
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                            Text("\(info.begin.formatted(format: "H:mm")) - \(info.end.formatted(format: "H:mm"))・\(info.location)")
+                                                .font(.caption2)
+                                                .foregroundColor(Color(UIColor.secondaryLabel))
+                                        }
+                                        .padding([.leading, .trailing], 12)
+                                        .padding([.top, .bottom], 8)
+                                        .background {
+                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                .fill(Color(hex: info.color ?? "#5D737E", opacity: colorScheme == .light ? 0.2 : 0.6))
+                                        }
+                                    }
+                                }
+                                .frame(height: height)
+                                .position(x: geometry.size.width / 2, y: y + height / 2 + 1)
+                                .onTapGesture {
+                                    onCustomScheduleTouch(info)
+                                }
+                            }
+                            .padding(2)
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -727,19 +909,21 @@ struct WeekScheduleView: View {
 
 struct DayTabView: View {
     @Binding var selectedDay: Date
-    let collegeId: College
+    let colleges: [College]
     let baseDay: Date
     let displayMode: DisplayMode
     let onScheduleTouch: (ScheduleInfo) -> Void
+    let onCustomScheduleTouch: (CustomSchedule) -> Void
     @State private var scrollPosition: ScrollPosition
     @State private var data = Array(-7...7)
 
-    init(selectedDay: Binding<Date>, collegeId: College, baseDay: Date, displayMode: DisplayMode, onScheduleTouch: @escaping (ScheduleInfo) -> Void) {
+    init(selectedDay: Binding<Date>, colleges: [College], baseDay: Date, displayMode: DisplayMode, onScheduleTouch: @escaping (ScheduleInfo) -> Void, onCustomScheduleTouch: @escaping (CustomSchedule) -> Void) {
         self._selectedDay = selectedDay
-        self.collegeId = collegeId
+        self.colleges = colleges
         self.baseDay = baseDay
         self.displayMode = displayMode
         self.onScheduleTouch = onScheduleTouch
+        self.onCustomScheduleTouch = onCustomScheduleTouch
         self.scrollPosition = .init(id: selectedDay.wrappedValue.daysSince(baseDay))
     }
 
@@ -749,7 +933,7 @@ struct DayTabView: View {
                 ForEach(data, id: \.self) { offset in
                     let day = baseDay.addDays(offset)
                     ScrollView {
-                        DayView(day: day, college: collegeId, onScheduleTouch: onScheduleTouch)
+                        DayView(day: day, colleges: colleges, onScheduleTouch: onScheduleTouch, onCustomScheduleTouch: onCustomScheduleTouch)
                     }
                     .frame(width: UIScreen.main.bounds.width)
                 }
@@ -794,19 +978,21 @@ struct DayTabView: View {
 
 struct WeekScheduleTabView: View {
     @Binding var selectedDay: Date
-    let collegeId: College
+    let colleges: [College]
     let baseDay: Date
     let displayMode: DisplayMode
     let onScheduleTouch: (ScheduleInfo) -> Void
+    let onCustomScheduleTouch: (CustomSchedule) -> Void
     @State private var scrollPosition: ScrollPosition
     @State private var data = Array(-5...5)
 
-    init(selectedDay: Binding<Date>, collegeId: College, baseDay: Date, displayMode: DisplayMode, onScheduleTouch: @escaping (ScheduleInfo) -> Void) {
+    init(selectedDay: Binding<Date>, colleges: [College], baseDay: Date, displayMode: DisplayMode, onScheduleTouch: @escaping (ScheduleInfo) -> Void, onCustomScheduleTouch: @escaping (CustomSchedule) -> Void) {
         self._selectedDay = selectedDay
-        self.collegeId = collegeId
+        self.colleges = colleges
         self.baseDay = baseDay
         self.displayMode = displayMode
         self.onScheduleTouch = onScheduleTouch
+        self.onCustomScheduleTouch = onCustomScheduleTouch
         self.scrollPosition = .init(id: selectedDay.wrappedValue.weeksSince(baseDay))
     }
 
@@ -815,7 +1001,7 @@ struct WeekScheduleTabView: View {
             LazyHStack(spacing: 0) {
                 ForEach(data, id: \.self) { offset in
                     let day = baseDay.addWeeks(offset)
-                    WeekScheduleView(day: day, college: collegeId, onScheduleTouch: onScheduleTouch)
+                    WeekScheduleView(day: day, colleges: colleges, onScheduleTouch: onScheduleTouch, onCustomScheduleTouch: onCustomScheduleTouch)
                         .frame(width: UIScreen.main.bounds.width - (displayMode == .week ? weekModeLeading : 0))
                 }
             }
@@ -862,7 +1048,9 @@ struct ScheduleView: View {
     @State private var baseDay: Date = Date.now.startOfWeek()
     @State private var lastHostingView: UIView!
     @State private var selectedSchedule: ScheduleInfo?
+    @State private var activeCustomSchedule: CustomSchedule?
     @AppStorage("collegeId", store: UserDefaults.shared) var collegeId: College = .sjtu
+    @AppStorage("showBothCollege", store: UserDefaults.shared) var showBothCollege: Bool = false
     @AppStorage("displayMode") var displayMode: DisplayMode = .day
     @AppStorage("schedule.headerImage") var headerImage: URL?
 
@@ -870,10 +1058,16 @@ struct ScheduleView: View {
         let onScheduleTouch: (ScheduleInfo) -> Void = { info in
             selectedSchedule = info
         }
+        
+        let onCustomScheduleTouch: (CustomSchedule) -> Void = { schedule in
+            activeCustomSchedule = schedule
+        }
+        
+        let colleges: [College] = (collegeId == .sjtu && showBothCollege) ? [.sjtu, .sjtug] : [collegeId]
 
         VStack(spacing: 0) {
             VStack {
-                ScheduleViewTitle(displayMode: $displayMode, selectedDay: selectedDay, college: collegeId)
+                ScheduleViewTitle(displayMode: $displayMode, selectedDay: selectedDay, college: collegeId, showBothCollege: showBothCollege, activeCustomSchedule: $activeCustomSchedule)
                     .padding()
                 
                 HStack(spacing: 0) {
@@ -927,13 +1121,13 @@ struct ScheduleView: View {
             Divider().frame(height: 1).background(Color(UIColor.systemGray6))
 
             if displayMode == .day {
-                DayTabView(selectedDay: $selectedDay, collegeId: collegeId, baseDay: baseDay, displayMode: displayMode, onScheduleTouch: onScheduleTouch)
+                DayTabView(selectedDay: $selectedDay, colleges: colleges, baseDay: baseDay, displayMode: displayMode, onScheduleTouch: onScheduleTouch, onCustomScheduleTouch: onCustomScheduleTouch)
             } else {
                 ScrollView {
                     HStack(spacing: 0) {
                         WeekScheduleTimeSlots(college: collegeId)
                             .frame(width: weekModeLeading)
-                        WeekScheduleTabView(selectedDay: $selectedDay, collegeId: collegeId, baseDay: baseDay, displayMode: displayMode, onScheduleTouch: onScheduleTouch)
+                        WeekScheduleTabView(selectedDay: $selectedDay, colleges: colleges, baseDay: baseDay, displayMode: displayMode, onScheduleTouch: onScheduleTouch, onCustomScheduleTouch: onCustomScheduleTouch)
                     }
                     .padding([.top, .bottom], 6)
                 }
@@ -1004,8 +1198,10 @@ struct ScheduleView: View {
                                 Button {
                                     selectedDay = semester.start_at
                                 } label: {
+                                    let desc = "\(semester.start_at.formatted(format: "yy/M")) ~ \(semester.end_at.formatted(format: "yy/M"))"
+                                    
                                     HStack {
-                                        Text("\(["秋", "春", "夏"][semester.semester - 1])季学期")
+                                        Text("\(["秋", "春", "夏"][semester.semester - 1])季学期 (\(desc))")
                                         if currentSemesters.first?.id == semester.id {
                                             Image(systemName: "checkmark")
                                         }
@@ -1036,6 +1232,132 @@ struct ScheduleView: View {
             .onChange(of: collegeId) {
                 $currentSemesters.college.wrappedValue = collegeId
             }
+        }
+    }
+}
+
+struct CustomScheduleEditorView: View {
+    @StateObject private var customScheduleEntry: CustomScheduleEntry
+    @Environment(\.dismiss) var dismiss
+    @AppStorage("collegeId", store: UserDefaults.shared) var collegeId: College = .sjtu
+
+    private let colleges = [
+        CollegeItem(id: College.sjtu, name: "本部（本科）"),
+        CollegeItem(id: College.sjtug, name: "本部（研究生）"),
+        CollegeItem(id: College.shsmu, name: "医学院"),
+    ]
+
+    private func isBefore(time1: String, time2: String) -> Bool {
+        let selfHour = Int(time1.split(separator: ":").first!)!
+        let otherHour = Int(time2.split(separator: ":").first!)!
+        if selfHour != otherHour {
+            return selfHour < otherHour
+        }
+        let selfMinute = Int(time1.split(separator: ":").last!)!
+        let otherMinute = Int(time2.split(separator: ":").last!)!
+        return selfMinute < otherMinute
+    }
+
+    init(customSchedule: CustomSchedule?) {
+        if let customSchedule {
+            _customScheduleEntry = .init(wrappedValue: CustomScheduleEntry(schedule: customSchedule))
+        } else {
+            _customScheduleEntry = .init(wrappedValue: CustomScheduleEntry())
+        }
+    }
+    
+    var body: some View {
+        let periods = CollegeTimeTable[collegeId]
+        
+        Form {
+            Section {
+                TextField("标题", text: $customScheduleEntry.name)
+                TextField("位置", text: $customScheduleEntry.location)
+            }
+            .submitLabel(.done)
+            
+            Section {
+                TextField("描述", text: $customScheduleEntry.description, axis: .vertical)
+                    .lineLimit(3...5)
+            }
+
+            Section {
+                DatePicker("开始", selection: $customScheduleEntry.begin, displayedComponents: [.date, .hourAndMinute])
+                DatePicker("结束", selection: $customScheduleEntry.end, in: customScheduleEntry.begin..., displayedComponents: [.date, .hourAndMinute])
+            }
+            .environment(\.timeZone, TimeZone(identifier: "Asia/Shanghai") ?? TimeZone.current)
+            
+            Section {
+                Picker("日历", selection: $customScheduleEntry.college) {
+                    ForEach(colleges, id: \.id) { college in
+                        Text(college.name).tag(college.id)
+                    }
+                }
+            }
+            
+            Section {
+                ColorPicker("主题色", selection: Binding(get: {
+                    Color(hex: customScheduleEntry.color)
+                }, set: { value in
+                    if let hex = value.toHex() {
+                        customScheduleEntry.color = hex
+                    }
+                }))
+            }
+            
+            if let id = customScheduleEntry.id {
+                Section {
+                    Button("删除日程") {
+                        Task {
+                            do {
+                                try await Eloquent.deleteCustomSchedule(id: id)
+                                WidgetCenter.shared.reloadAllTimelines()
+                                dismiss()
+                            } catch {
+                                print(error)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("取消") {
+                    dismiss()
+                }
+            }
+
+            ToolbarItem(placement: .confirmationAction) {
+                Button("保存") {
+                    Task {
+                        do {
+                            try await Eloquent.saveCustomSchedule(entry: customScheduleEntry)
+                            WidgetCenter.shared.reloadAllTimelines()
+                            dismiss()
+                        } catch {
+                            print(error)
+                        }
+                    }
+                }
+                .disabled(
+                    customScheduleEntry.name.isEmpty ||
+                    customScheduleEntry.college == nil ||
+                    customScheduleEntry.begin >= customScheduleEntry.end ||
+                    !customScheduleEntry.begin.isSameDay(as: customScheduleEntry.end) ||
+                    (
+                        periods != nil &&
+                        (
+                            isBefore(time1: periods!.last!.finish, time2: customScheduleEntry.begin.formatted(format: "H:mm"))
+                            ||
+                            isBefore(time1: customScheduleEntry.end.formatted(format: "H:mm"), time2: periods!.first!.start)
+                        )
+                    )
+                )
+            }
+        }
+        .onChange(of: collegeId, initial: true) {
+            customScheduleEntry.college = collegeId
         }
     }
 }

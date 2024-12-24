@@ -78,6 +78,126 @@ struct CanvasClass: Codable, FetchableRecord, PersistableRecord, Identifiable, E
     var class_id: String
 }
 
+struct CustomSchedule: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "custom_schedules"
+    
+    var id: Int64?
+    var name: String
+    var description: String
+    var location: String
+    var begin: Date
+    var end: Date
+    var semester_id: String?
+    var week: Int?
+    var category: CustomScheduleCategory
+    var college: College?
+    var color: String?
+}
+
+extension CustomSchedule {
+    func y() -> CGFloat {
+        guard let college else { return 0 }
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? TimeZone.current
+
+        let (startHour, endHour) = CollegeTimeTable[college]!.getHours()
+        let timeTableStartTime = formatter.date(from: "\(startHour):00")!
+        let timeTableEndTime = formatter.date(from: "\(endHour):00")!
+        let startTime = formatter.date(from: formatter.string(from: begin))!
+
+        return startTime.timeIntervalSince(timeTableStartTime) / timeTableEndTime.timeIntervalSince(timeTableStartTime) + height() / 2
+    }
+
+    func height() -> CGFloat {
+        guard let college else { return 0 }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? TimeZone.current
+
+        let (startHour, endHour) = CollegeTimeTable[college]!.getHours()
+        let timeTableStartTime = formatter.date(from: "\(startHour):00")!
+        let timeTableEndTime = formatter.date(from: "\(endHour):00")!
+        let startTime = formatter.date(from: formatter.string(from: begin))!
+        let finishTime = formatter.date(from: formatter.string(from: end))!
+
+        return finishTime.timeIntervalSince(startTime) / timeTableEndTime.timeIntervalSince(timeTableStartTime)
+    }
+
+    func duration() -> TimeInterval {
+        return end.timeIntervalSince(begin)
+    }
+    
+    private func isBefore(time1: String, time2: String) -> Bool {
+        let selfHour = Int(time1.split(separator: ":").first!)!
+        let otherHour = Int(time2.split(separator: ":").first!)!
+        if selfHour != otherHour {
+            return selfHour < otherHour
+        }
+        let selfMinute = Int(time1.split(separator: ":").last!)!
+        let otherMinute = Int(time2.split(separator: ":").last!)!
+        return selfMinute < otherMinute
+    }
+
+    func period() -> Int {
+        guard let college else { return 0 }
+        let periods = CollegeTimeTable[college]!
+        let scheduleStartTime = begin.formatted(format: "H:mm")
+        
+        for period in periods {
+            if isBefore(time1: scheduleStartTime, time2: period.finish) {
+                return period.id
+            }
+        }
+        
+        return 0
+    }
+    
+    func length() -> Int {
+        guard let college else { return 0 }
+        let startPeriod = period()
+        guard startPeriod != 0 else { return 0 }
+        let scheduleEndTime = end.formatted(format: "H:mm")
+
+        let periods = CollegeTimeTable[college]!
+        for period in periods {
+            if isBefore(time1: scheduleEndTime, time2: period.start) {
+                return period.id - startPeriod
+            }
+        }
+        
+        return 0
+    }
+}
+
+class CustomScheduleEntry: ObservableObject {
+    @Published var id: Int64?
+    @Published var name: String = ""
+    @Published var description: String = ""
+    @Published var location: String = ""
+    @Published var begin: Date = .now.startOfHour()
+    @Published var end: Date = .now.startOfHour().addHours(1)
+    @Published var college: College?
+    @Published var color: String = "#5D737E"
+    
+    init() {}
+    init(schedule: CustomSchedule) {
+        id = schedule.id
+        name = schedule.name
+        description = schedule.description
+        location = schedule.location
+        begin = schedule.begin
+        end = schedule.end
+        college = schedule.college
+        color = schedule.color ?? "#5D737E"
+    }
+    init(college: College) {
+        self.college = college
+    }
+}
+
 struct Schedule: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "schedules"
     static let class_ = belongsTo(Class.self, key: "classes")
@@ -90,6 +210,8 @@ struct Schedule: Codable, FetchableRecord, PersistableRecord {
     var week: Int
     var is_start: Bool
     var length: Int
+    var teachers: [String]?
+    var remark: String?
 }
 
 struct ScheduleInfo: FetchableRecord, Decodable, Equatable, Identifiable {
@@ -101,7 +223,7 @@ struct ScheduleInfo: FetchableRecord, Decodable, Equatable, Identifiable {
         lhs.schedule.period == rhs.schedule.period
     }
     
-    var id: String { "\(schedule.class_id),\(schedule.week),\(schedule.day),\(schedule.period)" }
+    var id: String { "\(class_.college),\(schedule.class_id),\(schedule.week),\(schedule.day),\(schedule.period)" }
     var schedule: Schedule
     var class_: Class
     var course: Course

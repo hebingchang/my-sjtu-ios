@@ -26,6 +26,22 @@ struct MySJTUApp: App {
         } catch {
             print(error)
         }
+        
+        Task {
+            let rawAccounts = UserDefaults.standard.string(forKey: "accounts")
+            if let rawAccounts {
+                if var accounts = Array<WebAuthAccount>(rawValue: rawAccounts) {
+                    for i in 0..<accounts.count {
+                        do {
+                            accounts[i] = try await accounts[i].refreshSession()
+                        } catch {
+                            print(error)
+                        }
+                    }
+                    UserDefaults.standard.set(accounts.rawValue, forKey: "accounts")
+                }
+            }
+        }
     }
 
     var body: some Scene {
@@ -36,27 +52,12 @@ struct MySJTUApp: App {
                 .onAppear {
                     UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = UIColor(named: "AccentColor")
                 }
-                .task {
-                    let rawAccounts = UserDefaults.standard.string(forKey: "accounts")
-                    if let rawAccounts {
-                        if var accounts = Array<WebAuthAccount>(rawValue: rawAccounts) {
-                            for i in 0..<accounts.count {
-                                do {
-                                    accounts[i] = try await accounts[i].refreshSession()
-                                } catch {
-                                    print(error)
-                                }
-                            }
-                            UserDefaults.standard.set(accounts.rawValue, forKey: "accounts")
-                        }
-                    }
-                }
                 .overlay {
                     ProgressOverlay(isShowingProgress: progressor.isShowingProgress, progress: progressor.progress)
                         .animation(.easeInOut, value: progressor.isShowingProgress)
                 }
                 .onChange(of: networkMonitor.isConnected) {
-                    if networkMonitor.isConnected {
+                    if networkMonitor.isConnected {                        
                         Task {
                             do {
                                 let status = try await getAppStatus()

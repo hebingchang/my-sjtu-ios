@@ -9,10 +9,12 @@ import SwiftUI
 @preconcurrency import WebKit
 
 struct BrowserView: View {
-    let url: URL
+    let urlRequest: URLRequest
     let redirectUrl: URL
     let cookiesDomains: [String]?
-    let onRedirect: (_ cookies: [HTTPCookie], _ code: String?) -> Void
+    let onRedirect: (_ url: URL, _ cookies: [HTTPCookie], _ code: String?) -> Void
+    let onlyCheckRedirectHost: Bool
+    
     @State private var webview = WKWebView()
     @State private var canGoBack: Bool = false
     @State private var canGoForward: Bool = false
@@ -24,10 +26,11 @@ struct BrowserView: View {
     var body: some View {
         NavigationStack {
             WebView(
-                url: url,
+                urlRequest: urlRequest,
                 redirectUrl: redirectUrl,
                 cookiesDomains: cookiesDomains,
                 onRedirect: onRedirect,
+                onlyCheckRedirectHost: onlyCheckRedirectHost,
                 wkwebView: $webview,
                 canGoBack: $canGoBack,
                 canGoForward: $canGoForward,
@@ -46,7 +49,7 @@ struct BrowserView: View {
                             Text(currentUrl.host() ?? "")
                                 .font(.headline)
                         } else {
-                            Text(url.host() ?? "")
+                            Text(urlRequest.url?.host() ?? "")
                                 .font(.headline)
                         }
                     }
@@ -101,10 +104,11 @@ struct BrowserView: View {
 }
 
 struct WebView: UIViewRepresentable {
-    let url: URL
+    let urlRequest: URLRequest
     let redirectUrl: URL
     let cookiesDomains: [String]?
-    let onRedirect: (_ cookies: [HTTPCookie], _ code: String?) -> Void
+    let onRedirect: (_ url: URL, _ cookies: [HTTPCookie], _ code: String?) -> Void
+    let onlyCheckRedirectHost: Bool
     
     @Binding var wkwebView: WKWebView
     @Binding var canGoBack: Bool
@@ -121,8 +125,7 @@ struct WebView: UIViewRepresentable {
         wkwebView.addObserver(context.coordinator, forKeyPath: #keyPath(WKWebView.isLoading), options: [.new], context: nil)
         wkwebView.addObserver(context.coordinator, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: [.new], context: nil)
 
-        let request = URLRequest(url: url)
-        wkwebView.load(request)
+        wkwebView.load(urlRequest)
         return wkwebView
     }
 
@@ -130,20 +133,22 @@ struct WebView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onRedirect: onRedirect, redirectUrl: redirectUrl, cookiesDomains: cookiesDomains, parent: self)
+        Coordinator(onRedirect: onRedirect, redirectUrl: redirectUrl, cookiesDomains: cookiesDomains, onlyCheckRedirectHost: onlyCheckRedirectHost, parent: self)
     }
 
     class Coordinator: NSObject, WKNavigationDelegate {
-        let onRedirect: (_ cookies: [HTTPCookie], _ code: String?) -> Void
+        let onRedirect: (_ url: URL, _ cookies: [HTTPCookie], _ code: String?) -> Void
         let redirectUrl: URL
         let cookiesDomains: [String]?
+        let onlyCheckRedirectHost: Bool
         let parent: WebView
 
-        init(onRedirect: @escaping (_ cookies: [HTTPCookie], _ code: String?) -> Void, redirectUrl: URL, cookiesDomains: [String]?, parent: WebView) {
+        init(onRedirect: @escaping (_ url: URL, _ cookies: [HTTPCookie], _ code: String?) -> Void, redirectUrl: URL, cookiesDomains: [String]?, onlyCheckRedirectHost: Bool, parent: WebView) {
             self.onRedirect = onRedirect
             self.redirectUrl = redirectUrl
             self.cookiesDomains = cookiesDomains
             self.parent = parent
+            self.onlyCheckRedirectHost = onlyCheckRedirectHost
         }
 
         override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
@@ -166,15 +171,25 @@ struct WebView: UIViewRepresentable {
             self.parent.currentUrl = webView.url
                         
             if let url = navigationAction.request.url,
-               url.scheme == redirectUrl.scheme,
-               url.host(percentEncoded: true) == redirectUrl.host(percentEncoded: true),
-               url.path(percentEncoded: true) == redirectUrl.path(percentEncoded: true)
+               (
+                onlyCheckRedirectHost &&
+                url.scheme == redirectUrl.scheme &&
+                url.host(percentEncoded: true) == redirectUrl.host(percentEncoded: true)
+               ) ||
+                (
+                    !onlyCheckRedirectHost &&
+                    url.scheme == redirectUrl.scheme &&
+                    url.host(percentEncoded: true) == redirectUrl.host(percentEncoded: true) &&
+                    url.path(percentEncoded: true) == redirectUrl.path(percentEncoded: true)
+                )
             {
+                decisionHandler(.allow)
+
                 let query = url.queryDictionary
                 var ssoCookies: [HTTPCookie] = []
                 
                 guard let cookiesDomains = self.cookiesDomains else {
-                    onRedirect([], query["code"])
+                    onRedirect(url, [], query["code"])
                     return
                 }
                 
@@ -188,10 +203,14 @@ struct WebView: UIViewRepresentable {
                         }
                     }
                     
-                    self.onRedirect(ssoCookies, query["code"])
+                    self.onRedirect(url, ssoCookies, query["code"])
                 }
+            } else if let url = navigationAction.request.url, url.scheme == "alipays" {
+                UIApplication.shared.open(url)
+                decisionHandler(.cancel)
+            } else {
+                decisionHandler(.allow)
             }
-            decisionHandler(.allow)
         }
     }
 }

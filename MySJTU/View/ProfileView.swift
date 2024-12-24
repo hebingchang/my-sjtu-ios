@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import WidgetKit
 
 struct CollegeItem: Identifiable {
     let id: College
@@ -14,15 +13,10 @@ struct CollegeItem: Identifiable {
 }
 
 struct ProfileView: View {
-    @AppStorage("collegeId", store: UserDefaults.shared) var collegeId: College = .sjtu
     @EnvironmentObject private var appConfig: AppConfig
-    
-    private let colleges = [
-        CollegeItem(id: College.sjtu, name: "本部（本科）"),
-        CollegeItem(id: College.sjtug, name: "本部（研究生）"),
-        CollegeItem(id: College.shsmu, name: "医学院"),
-    ]
-    
+    @AppStorage("accounts") var accounts: [WebAuthAccount] = []
+    @State private var hideTabBar: Bool = false
+
     var body: some View {
         NavigationStack {
             List {
@@ -34,20 +28,51 @@ struct ProfileView: View {
                             Label("账户", systemImage: "person.crop.circle")
                         }
                         
-                        Picker(selection: $collegeId) {
-                            ForEach(colleges, id: \.id) { college in
-                                Text(college.name).tag(college.id)
-                            }
+                        NavigationLink {
+                            DataSourceView()
                         } label: {
                             Label("数据源", systemImage: "square.and.arrow.down")
                         }
-                        .pickerStyle(.navigationLink)
                         
                         /* NavigationLink {
                          CustomizeView()
                          } label: {
                          Label("个性化", systemImage: "paintpalette")
                          } */
+                    }
+                }
+                
+                Section(header: Text("实用工具")) {
+                    if let account = (accounts.first {
+                        $0.provider == .jaccount
+                    }), account.enabledFeatures.contains(.canvas), account.bizData["canvas_token"] != nil {
+                        NavigationLink {
+                            CanvasEventsView()
+                        } label: {
+                            Label("作业", systemImage: "book.pages")
+                        }
+                    }
+                    
+                    NavigationLink {
+                        NotificationView()
+                    } label: {
+                        Label("教务通知", systemImage: "megaphone")
+                    }
+                    
+                    if let account = (accounts.first {
+                        $0.provider == .jaccount
+                    }), account.enabledFeatures.contains(.campus_card) {
+                        NavigationLink {
+                            CampusCardListView()
+                        } label: {
+                            Label("校园卡", systemImage: "person.text.rectangle")
+                        }
+                    }
+                    
+                    NavigationLink {
+                        BusMapView()
+                    } label: {
+                        Label("校园巴士", systemImage: "bus")
                     }
                 }
                 
@@ -58,9 +83,7 @@ struct ProfileView: View {
                 }
             }
             .navigationBarTitle("我的")
-            .onChange(of: collegeId) {
-                WidgetCenter.shared.reloadAllTimelines()
-            }
+            .toolbar(hideTabBar ? .hidden : .automatic, for: .tabBar)
         }
     }
 }

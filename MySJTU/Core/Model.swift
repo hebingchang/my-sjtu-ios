@@ -10,7 +10,6 @@ import Foundation
 extension College {
     var provider: Provider? {
         switch self {
-        case .custom: return nil
         case .sjtu: return .jaccount
         case .sjtug: return .jaccount
         case .shsmu: return .shsmu
@@ -21,12 +20,14 @@ extension College {
 enum Feature: Codable {
     case schedule
     case unicode
+    case campus_card
     case canvas
 
     var name: String {
         switch self {
         case .schedule: return "课程信息"
         case .unicode: return "思源码"
+        case .campus_card: return "校园卡"
         case .canvas: return "在线教学平台 (Canvas)"
         }
     }
@@ -125,7 +126,7 @@ struct AccessToken: Codable {
 }
 
 struct OpenApiResponse<T: Codable>: Codable {
-    var entities: [T]
+    var entities: [T]?
     var errno: Int
     var error: String
     var total: Int
@@ -141,6 +142,20 @@ struct Profile: Codable {
     var userType: String
     var organize: Organize
     var identities: [Identity]
+}
+
+struct CardPhoto: Codable {
+    var userId: String
+    var url: String?
+}
+
+struct CardTransaction: Codable, Hashable {
+    let dateTime: Int
+    let system: String
+    let merchantNo: String
+    let merchant: String
+    let description: String
+    let amount, cardBalance: Double
 }
 
 extension Profile {
@@ -210,4 +225,110 @@ struct Unicode: Codable {
     let showIcon: Bool
     let backgroundColor, messageColor, messageBackground, slowIcon: String?
     let slowMessage, slowMessageColor, slowMessageBackground: String?
+}
+
+struct UnicodeTransaction: Codable {
+    let orderNo: String
+    let orderTime, payTime: Int
+    let merchantNo, deviceNo: String?
+    let merchant: String
+    let amount: Double
+    let status: String
+    let channel: String
+}
+
+extension UnicodeTransaction {
+    func toCardTransaction() -> CardTransaction {
+        CardTransaction(dateTime: self.orderTime * 1000, system: self.channel, merchantNo: self.merchantNo ?? "UNKNOWN", merchant: self.merchant, description: "思源码交易", amount: self.amount, cardBalance: 0)
+    }
+}
+
+struct CampusCard: Codable {
+    enum CardType: Codable {
+        case general
+        case working
+        case undergraduate
+        case master
+        case doctor
+    }
+
+    struct User: Codable {
+        let name, code: String
+        let organize: Organize?
+        let timeZone: Int
+    }
+    
+    struct Organize: Codable {
+        let name: String
+    }
+    
+    let user: User
+    let cardNo, cardId, bankNo, expireDate: String
+    var cardBalance: Double
+    let transBalance: Int
+    let lost, frozen: Bool
+    
+    enum CodingKeys: String,CodingKey {
+        case user, cardNo, cardId, bankNo, expireDate, cardBalance, transBalance, lost, frozen
+    }
+    
+    var cardType: CardType = .general
+}
+
+struct CardChargeResponse: Codable {
+    let cardNo: String
+    let status: Status
+    let applyAmount: Int
+    let id: Int64
+    let postData: PostData
+    let applyTime, expireTime: String
+    let postURL: String
+    let serialNo: String
+
+    struct Status: Codable {
+        let name, code: String
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case cardNo, status, applyAmount, id, postData, applyTime, expireTime
+        case postURL = "postUrl"
+        case serialNo
+    }
+}
+
+struct CardChargeStatus: Codable, Equatable, Identifiable {
+    static func == (lhs: CardChargeStatus, rhs: CardChargeStatus) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    let id: Int64
+    let cardNo: String
+    let status: Status
+    let serialNo: String
+    let applyAmount: Int
+    let applyTime, expireTime: String
+    let failedReason: String?
+    let postUrl: String?
+    let postData: PostData?
+
+    struct Status: Codable {
+        let name, code: String
+    }
+}
+
+struct PostData: Codable {
+    let data, subsysid, sysid, sign: String
+}
+
+extension PostData {
+    func toQueryString() -> String? {
+        var components = URLComponents()
+        components.queryItems = [
+            URLQueryItem(name: "data", value: data),
+            URLQueryItem(name: "subsysid", value: subsysid),
+            URLQueryItem(name: "sysid", value: sysid),
+            URLQueryItem(name: "sign", value: sign)
+        ]
+        return components.percentEncodedQuery
+    }
 }
