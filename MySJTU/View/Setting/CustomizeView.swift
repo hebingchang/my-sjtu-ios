@@ -34,6 +34,14 @@ struct CustomizeView: View {
                 }
             }
 
+            Section(header: Text("小组件")) {
+                NavigationLink {
+                    WidgetBackgroundImageSettingsView()
+                } label: {
+                    Label("桌面小组件背景", systemImage: "square.grid.2x2")
+                }
+            }
+
             Section(header: Text("标签栏")) {
                 HStack {
                     Text("始终显示思源码标签")

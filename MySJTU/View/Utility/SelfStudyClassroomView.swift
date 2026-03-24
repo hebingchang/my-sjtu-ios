@@ -19,17 +19,55 @@ private enum SelfStudyRoomAvailability: Equatable {
     case closed
 }
 
+private struct SelfStudyRoomDisplay: Identifiable {
+    let room: SelfStudyClassroomAPI.Room
+    let availability: SelfStudyRoomAvailability
+
+    var id: Int {
+        room.id
+    }
+}
+
 private struct SelfStudyFloorDisplay: Identifiable {
     let floor: SelfStudyClassroomAPI.Floor
-    let rooms: [SelfStudyClassroomAPI.Room]
+    let freeCount: Int
+    let rooms: [SelfStudyRoomDisplay]
 
     var id: Int {
         floor.id
     }
 }
 
+private struct SelfStudyDisplaySnapshot {
+    let floors: [SelfStudyFloorDisplay]
+    private let closedSectionsByCode: [String: Set<Int>]
+    private let closedSectionsByName: [String: Set<Int>]
+
+    init(
+        floors: [SelfStudyFloorDisplay],
+        closedSectionsByCode: [String: Set<Int>],
+        closedSectionsByName: [String: Set<Int>]
+    ) {
+        self.floors = floors
+        self.closedSectionsByCode = closedSectionsByCode
+        self.closedSectionsByName = closedSectionsByName
+    }
+
+    func closedSections(for room: SelfStudyClassroomAPI.Room) -> Set<Int> {
+        if let sections = closedSectionsByCode[room.roomCode.uppercased()] {
+            return sections
+        }
+
+        if let sections = closedSectionsByName[room.name] {
+            return sections
+        }
+
+        return []
+    }
+}
+
 struct SelfStudyClassroomView: View {
-    @AppStorage("accounts") private var accounts: [WebAuthAccount] = []
+    private let minimumInitialLoadingDuration: Duration = .milliseconds(600)
 
     @State private var loadingInitialData: Bool = true
     @State private var loadingUsageData: Bool = false
@@ -44,11 +82,9 @@ struct SelfStudyClassroomView: View {
     @State private var closedRooms: [SelfStudyClassroomAPI.ClosedRoom] = []
     @State private var serverCurrentSectionIndex: Int?
     @State private var loadErrorMessage: String?
+    @State private var initialLoadingStartedAt: ContinuousClock.Instant?
     @State private var loadingSessionID: Int = 0
-
-    private var account: WebAuthAccount? {
-        accounts.first { $0.provider == .jaccount }
-    }
+    @State private var latestSnapshotRequestID: Int = 0
 
     private var backgroundGradient: some View {
         LinearGradient(
@@ -77,29 +113,16 @@ struct SelfStudyClassroomView: View {
     }
 
     private var effectiveCurrentSectionIndex: Int? {
-        if let serverCurrentSectionIndex {
+        if let localReferenceSectionIndex = sections.referenceSectionIndex() {
+            return localReferenceSectionIndex
+        }
+
+        if sections.isEmpty,
+           let serverCurrentSectionIndex {
             return serverCurrentSectionIndex
         }
 
-        let now = Date.now
-        for section in sections {
-            guard let start = now.timeOfDay("HH:mm", timeStr: section.startTime),
-                  let end = now.timeOfDay("HH:mm", timeStr: section.endTime) else {
-                continue
-            }
-
-            if now >= start && now <= end {
-                return section.sectionIndex
-            }
-        }
-
-        for section in sections {
-            if let start = now.timeOfDay("HH:mm", timeStr: section.startTime), now < start {
-                return section.sectionIndex
-            }
-        }
-
-        return sections.last?.sectionIndex
+        return nil
     }
 
     private var activeSectionIndex: Int? {
@@ -118,60 +141,109 @@ struct SelfStudyClassroomView: View {
         return sections.first { $0.sectionIndex == activeSectionIndex }
     }
 
-    private var closedSectionsByCode: [String: Set<Int>] {
-        var result: [String: Set<Int>] = [:]
-        for room in closedRooms {
+    private var currentDisplaySnapshot: SelfStudyDisplaySnapshot {
+        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let activeSectionIndex = activeSectionIndex
+        let totalSectionCount = sections.count
+        let closedSectionsByCode = closedRooms.reduce(into: [String: Set<Int>]()) { result, room in
             result[room.roomCode.uppercased()] = room.closedSections
         }
-        return result
-    }
-
-    private var closedSectionsByName: [String: Set<Int>] {
-        var result: [String: Set<Int>] = [:]
-        for room in closedRooms {
+        let closedSectionsByName = closedRooms.reduce(into: [String: Set<Int>]()) { result, room in
             result[room.roomName] = room.closedSections
         }
-        return result
-    }
-    
-    private var displayedFloors: [SelfStudyFloorDisplay] {
-        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
-        return floors
-            .map { floor in
-                let rooms = floor.rooms
-                    .filter { room in
-                        if !keyword.isEmpty {
-                            let searchableText = room.name.lowercased()
-                            if !searchableText.contains(keyword) {
-                                return false
-                            }
-                        }
-
-                        if onlyShowFreeRooms {
-                            return isFreeLike(availability(for: room, at: activeSectionIndex))
-                        }
-
-                        return true
-                    }
-                    .sorted { lhs, rhs in
-                        let leftOrder = availabilityOrder(availability(for: lhs, at: activeSectionIndex))
-                        let rightOrder = availabilityOrder(availability(for: rhs, at: activeSectionIndex))
-
-                        if leftOrder != rightOrder {
-                            return leftOrder < rightOrder
-                        }
-
-                        if lhs.indexNum != rhs.indexNum {
-                            return (lhs.indexNum ?? .max) < (rhs.indexNum ?? .max)
-                        }
-
-                        return lhs.name < rhs.name
-                    }
-
-                return SelfStudyFloorDisplay(floor: floor, rooms: rooms)
+        func closedSections(for room: SelfStudyClassroomAPI.Room) -> Set<Int> {
+            if let sections = closedSectionsByCode[room.roomCode.uppercased()] {
+                return sections
             }
-            .filter { !$0.rooms.isEmpty }
+
+            if let sections = closedSectionsByName[room.name] {
+                return sections
+            }
+
+            return []
+        }
+
+        func availability(for room: SelfStudyClassroomAPI.Room) -> SelfStudyRoomAvailability {
+            let closedSections = closedSections(for: room)
+
+            guard let activeSectionIndex else {
+                if !closedSections.isEmpty && closedSections.count >= totalSectionCount {
+                    return .closed
+                }
+                return room.isSelfStudyRoom ? .selfStudy : .free
+            }
+
+            if closedSections.contains(activeSectionIndex) {
+                return .closed
+            }
+
+            let course = room.courses.first {
+                $0.startSection <= activeSectionIndex && $0.endSection >= activeSectionIndex
+            }
+            if course != nil {
+                return .occupied(course)
+            }
+
+            return room.isSelfStudyRoom ? .selfStudy : .free
+        }
+
+        let floorDisplays = floors.compactMap { floor -> SelfStudyFloorDisplay? in
+            let roomDisplays = floor.rooms.map { room in
+                SelfStudyRoomDisplay(
+                    room: room,
+                    availability: availability(for: room)
+                )
+            }
+            let freeCount = roomDisplays.reduce(into: 0) { result, roomDisplay in
+                if isFreeLike(roomDisplay.availability) {
+                    result += 1
+                }
+            }
+            let filteredRooms = roomDisplays
+                .filter { roomDisplay in
+                    if !keyword.isEmpty,
+                       !roomDisplay.room.name.localizedCaseInsensitiveContains(keyword) {
+                        return false
+                    }
+
+                    if onlyShowFreeRooms {
+                        return isFreeLike(roomDisplay.availability)
+                    }
+
+                    return true
+                }
+                .sorted { lhs, rhs in
+                    let leftOrder = availabilityOrder(lhs.availability)
+                    let rightOrder = availabilityOrder(rhs.availability)
+
+                    if leftOrder != rightOrder {
+                        return leftOrder < rightOrder
+                    }
+
+                    if lhs.room.indexNum != rhs.room.indexNum {
+                        return (lhs.room.indexNum ?? .max) < (rhs.room.indexNum ?? .max)
+                    }
+
+                    return lhs.room.name < rhs.room.name
+                }
+
+            guard !filteredRooms.isEmpty else {
+                return nil
+            }
+
+            return SelfStudyFloorDisplay(
+                floor: floor,
+                freeCount: freeCount,
+                rooms: filteredRooms
+            )
+        }
+
+        return SelfStudyDisplaySnapshot(
+            floors: floorDisplays,
+            closedSectionsByCode: closedSectionsByCode,
+            closedSectionsByName: closedSectionsByName
+        )
     }
 
     var body: some View {
@@ -186,14 +258,9 @@ struct SelfStudyClassroomView: View {
                         .foregroundStyle(.secondary)
                 }
                 .transition(.opacity)
-            } else if account == nil {
-                ContentUnavailableView(
-                    "未找到可用账号",
-                    systemImage: "person.crop.circle.badge.exclamationmark",
-                    description: Text("请先在设置中登录 jAccount 账号后再使用自习教室。")
-                )
-                .transition(.opacity)
             } else {
+                let displaySnapshot = loadingUsageData ? nil : currentDisplaySnapshot
+
                 List {
                     querySection
                     if loadingUsageData {
@@ -205,7 +272,7 @@ struct SelfStudyClassroomView: View {
                                 )
                             )
                     } else {
-                        resultSection
+                        resultSection(displaySnapshot: displaySnapshot ?? currentDisplaySnapshot)
                             .transition(
                                 .asymmetric(
                                     insertion: .opacity.combined(with: .offset(y: 8)),
@@ -217,10 +284,13 @@ struct SelfStudyClassroomView: View {
                 .scrollContentBackground(.hidden)
                 .listStyle(.insetGrouped)
                 .refreshable {
-                    await loadBuildingSnapshot(showLoader: true)
+                    await loadBuildingSnapshot()
                 }
                 .animation(.snappy(duration: 0.28, extraBounce: 0.02), value: loadingUsageData)
-                .animation(.snappy(duration: 0.3, extraBounce: 0.02), value: displayedFloors.count)
+                .animation(
+                    .snappy(duration: 0.3, extraBounce: 0.02),
+                    value: displaySnapshot?.floors.count ?? 0
+                )
                 .transition(.opacity)
             }
         }
@@ -243,13 +313,8 @@ struct SelfStudyClassroomView: View {
                 return
             }
 
-            floors = []
-            closedRooms = []
-            loadingUsageData = true
-            loadingSessionID += 1
-
             Task {
-                await loadBuildingSnapshot(showLoader: false)
+                await loadBuildingSnapshot()
             }
         }
     }
@@ -283,7 +348,7 @@ struct SelfStudyClassroomView: View {
             Toggle("只看空闲教室", isOn: $onlyShowFreeRooms)
 
             if let activeSection {
-                LabeledContent("当前参考节次") {
+                LabeledContent("参考节次") {
                     Text("第\(activeSection.sectionIndex)节")
                 }
             }
@@ -323,7 +388,7 @@ struct SelfStudyClassroomView: View {
     }
 
     @ViewBuilder
-    private var resultSection: some View {
+    private func resultSection(displaySnapshot: SelfStudyDisplaySnapshot) -> some View {
         if loadingUsageData && floors.isEmpty {
             Section {
                 HStack {
@@ -333,7 +398,7 @@ struct SelfStudyClassroomView: View {
                 }
                 .padding(.vertical, 12)
             }
-        } else if displayedFloors.isEmpty {
+        } else if displaySnapshot.floors.isEmpty {
             Section {
                 ContentUnavailableView(
                     "没有找到符合条件的教室",
@@ -342,47 +407,43 @@ struct SelfStudyClassroomView: View {
                 )
             }
         } else {
-            ForEach(displayedFloors) { floorDisplay in
+            ForEach(displaySnapshot.floors) { floorDisplay in
                 Section {
-                    ForEach(floorDisplay.rooms) { room in
+                    ForEach(floorDisplay.rooms) { roomDisplay in
                         NavigationLink {
                             SelfStudyRoomDetailView(
                                 campusName: selectedCampus?.name ?? "",
                                 buildingName: selectedBuilding?.name ?? "",
                                 floorName: floorDisplay.floor.name,
-                                room: room,
+                                room: roomDisplay.room,
                                 sections: sections,
                                 currentSectionIndex: activeSectionIndex,
-                                closedSections: closedSections(for: room),
-                                authCookies: account?.cookies.compactMap(\.httpCookie) ?? []
+                                closedSections: displaySnapshot.closedSections(for: roomDisplay.room)
                             )
                         } label: {
-                            roomRow(room)
+                            roomRow(roomDisplay)
                         }
                     }
                 } header: {
-                    floorHeader(floorDisplay.floor)
+                    floorHeader(floorDisplay)
                 }
-                .sectionIndexLabel(floorIndexLabel(for: floorDisplay.floor))
             }
         }
     }
 
     @ViewBuilder
-    private func roomRow(_ room: SelfStudyClassroomAPI.Room) -> some View {
-        let availability = availability(for: room, at: activeSectionIndex)
-
+    private func roomRow(_ roomDisplay: SelfStudyRoomDisplay) -> some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(room.name)
+                Text(roomDisplay.room.name)
                     .font(.headline)
 
-                if let studentCount = room.actualStudentCount, studentCount > 0 {
+                if let studentCount = roomDisplay.room.actualStudentCount, studentCount > 0 {
                     compactMeta(systemImage: "person.2.fill", text: "在室约\(studentCount)人")
                         .foregroundStyle(.secondary)
                 }
 
-                if case .occupied(let course) = availability, let course {
+                if case .occupied(let course) = roomDisplay.availability, let course {
                     Text("本节课程：\(course.courseName)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -391,23 +452,17 @@ struct SelfStudyClassroomView: View {
             }
 
             Spacer(minLength: 8)
-            availabilityBadge(availability)
+            availabilityBadge(roomDisplay.availability)
         }
         .padding(.vertical, 4)
     }
 
     @ViewBuilder
-    private func floorHeader(_ floor: SelfStudyClassroomAPI.Floor) -> some View {
-        let freeCount = floor.rooms.reduce(into: 0) { result, room in
-            if isFreeLike(availability(for: room, at: activeSectionIndex)) {
-                result += 1
-            }
-        }
-
+    private func floorHeader(_ floorDisplay: SelfStudyFloorDisplay) -> some View {
         HStack {
-            Text(floor.name)
+            Text(floorDisplay.floor.name)
             Spacer()
-            Text("空闲 \(freeCount)/\(floor.rooms.count)")
+            Text("空闲 \(floorDisplay.freeCount)/\(floorDisplay.floor.rooms.count)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -467,41 +522,6 @@ struct SelfStudyClassroomView: View {
         }
     }
     
-    private func floorIndexLabel(for floor: SelfStudyClassroomAPI.Floor) -> String? {
-        if let floorIndex = floor.indexNum {
-            if floorIndex < 0 {
-                return "B\(-floorIndex)F"
-            }
-            return "\(floorIndex)F"
-        }
-
-        let trimmedFloorName = floor.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedFloorName.isEmpty else {
-            return nil
-        }
-        
-        if let match = trimmedFloorName.range(of: #"-?\d+"#, options: .regularExpression),
-           let number = Int(trimmedFloorName[match]) {
-            if number < 0 {
-                return "B\(-number)F"
-            }
-            return "\(number)F"
-        }
-
-        return String(trimmedFloorName.prefix(1))
-    }
-
-    private func isAllDayClosed(_ room: SelfStudyClassroomAPI.Room) -> Bool {
-        let roomClosedSections = closedSections(for: room)
-        let sectionIndexes = Set(sections.map(\.sectionIndex))
-
-        guard !sectionIndexes.isEmpty else {
-            return false
-        }
-
-        return sectionIndexes.isSubset(of: roomClosedSections)
-    }
-
     private func availabilityOrder(_ availability: SelfStudyRoomAvailability) -> Int {
         switch availability {
         case .free:
@@ -524,42 +544,6 @@ struct SelfStudyClassroomView: View {
         }
     }
 
-    private func closedSections(for room: SelfStudyClassroomAPI.Room) -> Set<Int> {
-        if let sections = closedSectionsByCode[room.roomCode.uppercased()] {
-            return sections
-        }
-
-        if let sections = closedSectionsByName[room.name] {
-            return sections
-        }
-
-        return []
-    }
-
-    private func availability(for room: SelfStudyClassroomAPI.Room, at sectionIndex: Int?) -> SelfStudyRoomAvailability {
-        let closedSections = closedSections(for: room)
-
-        guard let sectionIndex else {
-            if !closedSections.isEmpty && closedSections.count >= sections.count {
-                return .closed
-            }
-            return room.isSelfStudyRoom ? .selfStudy : .free
-        }
-
-        if closedSections.contains(sectionIndex) {
-            return .closed
-        }
-
-        let course = room.courses.first {
-            $0.startSection <= sectionIndex && $0.endSection >= sectionIndex
-        }
-        if course != nil {
-            return .occupied(course)
-        }
-
-        return room.isSelfStudyRoom ? .selfStudy : .free
-    }
-
     private func syncSelectedBuildingWithCampus() {
         guard let campus = selectedCampus else {
             selectedBuildingID = nil
@@ -575,9 +559,17 @@ struct SelfStudyClassroomView: View {
     }
 
     @MainActor
-    private func finishInitialLoading() {
+    private func finishInitialLoading() async {
         guard loadingInitialData else {
             return
+        }
+
+        if let initialLoadingStartedAt {
+            let elapsed = initialLoadingStartedAt.duration(to: .now)
+            let remaining = minimumInitialLoadingDuration - elapsed
+            if remaining > .zero {
+                try? await Task.sleep(for: remaining)
+            }
         }
 
         withAnimation(.easeInOut(duration: 0.25)) {
@@ -587,14 +579,8 @@ struct SelfStudyClassroomView: View {
 
     @MainActor
     private func loadInitialData() async {
-        guard let account else {
-            finishInitialLoading()
-            loadErrorMessage = "未找到可用账号。"
-            return
-        }
-
-        let cookies = account.cookies.compactMap(\.httpCookie)
-        let api = SelfStudyClassroomAPI(cookies: cookies)
+        let api = SelfStudyClassroomAPI()
+        initialLoadingStartedAt = .now
 
         do {
             async let campusesTask = api.fetchCampuses()
@@ -615,55 +601,56 @@ struct SelfStudyClassroomView: View {
             await loadBuildingSnapshot()
         } catch {
             loadErrorMessage = errorText(error)
-            finishInitialLoading()
+            await finishInitialLoading()
         }
     }
 
     @MainActor
-    private func loadBuildingSnapshot(showLoader: Bool = true) async {
-        guard let account else {
-            finishInitialLoading()
-            loadErrorMessage = "未找到可用账号。"
-            return
-        }
-
+    private func loadBuildingSnapshot() async {
         guard let selectedBuilding else {
-            finishInitialLoading()
             floors = []
             closedRooms = []
+            await finishInitialLoading()
             return
         }
 
-        let cookies = account.cookies.compactMap(\.httpCookie)
-        let api = SelfStudyClassroomAPI(cookies: cookies)
-
-        if showLoader {
-            loadingUsageData = true
-            loadingSessionID += 1
-        }
+        let api = SelfStudyClassroomAPI()
+        latestSnapshotRequestID += 1
+        let requestID = latestSnapshotRequestID
+        loadingUsageData = true
+        loadingSessionID += 1
 
         do {
             let snapshot = try await api.fetchBuildingSnapshot(buildId: selectedBuilding.id)
+            guard requestID == latestSnapshotRequestID else {
+                return
+            }
             floors = snapshot.floors
             closedRooms = snapshot.closedRooms
             loadErrorMessage = nil
         } catch {
+            guard requestID == latestSnapshotRequestID else {
+                return
+            }
             loadErrorMessage = errorText(error)
             floors = []
             closedRooms = []
         }
 
+        guard requestID == latestSnapshotRequestID else {
+            return
+        }
         loadingUsageData = false
-        finishInitialLoading()
+        await finishInitialLoading()
     }
 
     private func errorText(_ error: Error) -> String {
         if let apiError = error as? APIError {
             switch apiError {
             case .sessionExpired:
-                return "登录状态已过期，请重新登录后再试。"
+                return "服务暂时不可用，请稍后重试。"
             case .noAccount:
-                return "未找到可用账号，请先登录 jAccount。"
+                return "服务暂时不可用，请稍后重试。"
             case .remoteError(let message):
                 return message
             case .runtimeError(let message):

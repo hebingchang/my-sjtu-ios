@@ -9,7 +9,7 @@ import SwiftUI
 import UIKit
 
 struct NativeTabBarController: UIViewControllerRepresentable {
-    private enum TabIndex: Int {
+    fileprivate enum TabIndex: Int {
         case home = 0
         case unicode = 1
         case profile = 2
@@ -17,10 +17,15 @@ struct NativeTabBarController: UIViewControllerRepresentable {
 
     @Binding var selectedIndex: Int
     var displayMode: DisplayMode
+    var showsUnicodeTab: Bool
     var onActionTap: () -> Void
 
     private var homeIconName: String {
         displayMode == .day ? "calendar.day.timeline.left" : "calendar"
+    }
+
+    private var visibleTabs: [TabIndex] {
+        showsUnicodeTab ? [.home, .unicode, .profile] : [.home, .profile]
     }
 
     func makeCoordinator() -> Coordinator {
@@ -31,47 +36,108 @@ struct NativeTabBarController: UIViewControllerRepresentable {
         let tab = UITabBarController()
         tab.delegate = context.coordinator
 
-        tab.viewControllers = [
-            homeController(),
-            unicodeController(),
-            profileController(),
-        ]
-        tab.selectedIndex = selectedIndex
+        tab.viewControllers = context.coordinator.viewControllers(for: visibleTabs)
+        tab.selectedIndex = visibleIndex(for: normalizedSelection(preferred: selectedIndex, fallback: nil))
 
         return tab
     }
 
     func updateUIViewController(_ uiViewController: UITabBarController, context: Context) {
-        if uiViewController.selectedIndex != selectedIndex {
-            uiViewController.selectedIndex = selectedIndex
+        context.coordinator.parent = self
+
+        let currentLogicalSelection = currentTabIndex(in: uiViewController)
+        let normalizedSelection = normalizedSelection(
+            preferred: selectedIndex,
+            fallback: currentLogicalSelection
+        )
+
+        if currentLogicalSelection?.rawValue != normalizedSelection {
+            context.coordinator.updateSelectedIndex(to: normalizedSelection)
         }
 
-        if let viewControllers = uiViewController.viewControllers,
-           viewControllers.indices.contains(TabIndex.home.rawValue) {
-            let homeTabBarItem = viewControllers[TabIndex.home.rawValue].tabBarItem
-            if homeTabBarItem?.accessibilityIdentifier != homeIconName {
-                homeTabBarItem?.image = UIImage(systemName: homeIconName)
-                homeTabBarItem?.selectedImage = nil
-                homeTabBarItem?.accessibilityIdentifier = homeIconName
-            }
+        if currentTabOrder(in: uiViewController) != visibleTabs {
+            uiViewController.setViewControllers(
+                context.coordinator.viewControllers(for: visibleTabs),
+                animated: false
+            )
         }
+
+        let targetVisibleIndex = visibleIndex(for: normalizedSelection)
+        if uiViewController.selectedIndex != targetVisibleIndex {
+            uiViewController.selectedIndex = targetVisibleIndex
+        }
+
+        context.coordinator.updateHomeTabBarItem(iconName: homeIconName)
+    }
+
+    private func normalizedSelection(preferred: Int, fallback: TabIndex?) -> Int {
+        if visibleTabs.contains(where: { $0.rawValue == preferred }) {
+            return preferred
+        }
+
+        if let fallback, visibleTabs.contains(fallback) {
+            return fallback.rawValue
+        }
+
+        return TabIndex.home.rawValue
+    }
+
+    private func visibleIndex(for logicalIndex: Int) -> Int {
+        visibleTabs.firstIndex(where: { $0.rawValue == logicalIndex }) ?? 0
+    }
+
+    private func currentTabOrder(in tabBarController: UITabBarController) -> [TabIndex] {
+        tabBarController.viewControllers?.compactMap {
+            TabIndex(rawValue: $0.tabBarItem.tag)
+        } ?? []
+    }
+
+    private func currentTabIndex(in tabBarController: UITabBarController) -> TabIndex? {
+        guard let selectedViewController = tabBarController.selectedViewController else {
+            return nil
+        }
+
+        return TabIndex(rawValue: selectedViewController.tabBarItem.tag)
     }
 
     final class Coordinator: NSObject, UITabBarControllerDelegate {
         var parent: NativeTabBarController
+        private lazy var cachedHomeController = parent.homeController()
+        private lazy var cachedUnicodeController = parent.unicodeController()
+        private lazy var cachedProfileController = parent.profileController()
+        private var currentHomeIconName: String?
 
         init(parent: NativeTabBarController) {
             self.parent = parent
         }
 
+        fileprivate func viewControllers(for tabs: [TabIndex]) -> [UIViewController] {
+            tabs.map { tab in
+                switch tab {
+                case .home:
+                    cachedHomeController
+                case .unicode:
+                    cachedUnicodeController
+                case .profile:
+                    cachedProfileController
+                }
+            }
+        }
+
+        func updateHomeTabBarItem(iconName: String) {
+            guard currentHomeIconName != iconName,
+                  let homeTabBarItem = cachedHomeController.tabBarItem else {
+                return
+            }
+
+            homeTabBarItem.image = UIImage(systemName: iconName)
+            homeTabBarItem.selectedImage = nil
+            currentHomeIconName = iconName
+        }
+
         func tabBarController(_ tabBarController: UITabBarController,
                               shouldSelect viewController: UIViewController) -> Bool {
-            guard
-                let vcs = tabBarController.viewControllers,
-                let index = vcs.firstIndex(of: viewController)
-            else { return true }
-
-            if index == TabIndex.unicode.rawValue {
+            if viewController.tabBarItem.tag == TabIndex.unicode.rawValue {
                 parent.onActionTap()
                 return false
             }
@@ -80,7 +146,17 @@ struct NativeTabBarController: UIViewControllerRepresentable {
 
         func tabBarController(_ tabBarController: UITabBarController,
                               didSelect viewController: UIViewController) {
-            parent.selectedIndex = tabBarController.selectedIndex
+            updateSelectedIndex(to: viewController.tabBarItem.tag)
+        }
+
+        func updateSelectedIndex(to logicalIndex: Int) {
+            guard parent.selectedIndex != logicalIndex else {
+                return
+            }
+
+            DispatchQueue.main.async {
+                self.parent.selectedIndex = logicalIndex
+            }
         }
     }
 
@@ -120,6 +196,8 @@ struct NativeTabBarController: UIViewControllerRepresentable {
 struct RootTabView: View {
     let today = Calendar.current.component(.day, from: Date())
     @AppStorage("displayMode") var displayMode: DisplayMode = .day
+    @AppStorage("accounts") private var accounts: [WebAuthAccount] = []
+    @AppStorage("settings.always_show_unicode_in_tabbar") private var alwaysShowUnicode: Bool = true
     @StateObject var qaManager = QuickActionsManager.instance
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject private var appConfig: AppConfig
@@ -131,30 +209,25 @@ struct RootTabView: View {
     @State private var showNoAccountAlert: Bool = false
     @State private var showNoPermission: Bool = false
     @State private var inSetting: Bool = false
+
+    private var shouldShowUnicodeTab: Bool {
+        appConfig.appStatus == .review ||
+        alwaysShowUnicode ||
+        accounts.contains(where: { $0.provider == .jaccount && $0.enabledFeatures.contains(.unicode) })
+    }
     
     private func checkUnicode(alert: Bool = true) {
         if appConfig.appStatus == .review {
             isUnicodePresented = true
             return
         }
-        
-        let rawAccounts = UserDefaults.standard.string(forKey: "accounts")
-        if let rawAccounts {
-            if let accounts = Array<WebAuthAccount>(rawValue: rawAccounts) {
-                if let sjtuAccount = accounts.first(where: { $0.provider == .jaccount }) {
-                    if sjtuAccount.enabledFeatures.contains(.unicode) {
-                        isUnicodePresented = true
-                    } else if alert {
-                        inSetting = true
-                        showNoPermission = true
-                    }
-                } else if alert {
-                    inSetting = true
-                    showNoAccountAlert = true
-                }
+
+        if let sjtuAccount = accounts.first(where: { $0.provider == .jaccount }) {
+            if sjtuAccount.enabledFeatures.contains(.unicode) {
+                isUnicodePresented = true
             } else if alert {
                 inSetting = true
-                showNoAccountAlert = true
+                showNoPermission = true
             }
         } else if alert {
             inSetting = true
@@ -163,7 +236,11 @@ struct RootTabView: View {
     }
     
     var body: some View {
-        NativeTabBarController(selectedIndex: $selectedIndex, displayMode: displayMode) {
+        NativeTabBarController(
+            selectedIndex: $selectedIndex,
+            displayMode: displayMode,
+            showsUnicodeTab: shouldShowUnicodeTab
+        ) {
             checkUnicode()
         }
         .ignoresSafeArea()

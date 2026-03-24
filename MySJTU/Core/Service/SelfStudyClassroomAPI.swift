@@ -9,7 +9,6 @@ import Foundation
 import Alamofire
 
 struct SelfStudyClassroomAPI {
-    var cookies: [HTTPCookie]
     private let baseURL = "https://ids.sjtu.edu.cn"
 
     struct Campus: Identifiable, Hashable {
@@ -229,21 +228,10 @@ struct SelfStudyClassroomAPI {
         }
     }
 
-    private func installCookies() throws {
-        guard !cookies.isEmpty else {
-            throw APIError.noAccount
-        }
-
-        cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
-        }
-    }
-
     private func request<T: Decodable>(
         path: String,
         parameters: Parameters? = nil
     ) async throws -> IDSResponse<T> {
-        try installCookies()
         let url = "\(baseURL)\(path)"
         let decoder = JSONDecoder()
         var hasBootstrappedSession = false
@@ -576,5 +564,40 @@ struct SelfStudyClassroomAPI {
         return sourceURL
             .deletingLastPathComponent()
             .appendingPathComponent("pano.xml")
+    }
+}
+
+extension Array where Element == SelfStudyClassroomAPI.SectionTime {
+    func referenceSection(for now: Date = .now) -> Element? {
+        let resolvedSections = compactMap { section -> (section: Element, start: Date, end: Date)? in
+            guard let start = now.timeOfDay("HH:mm", timeStr: section.startTime),
+                  let end = now.timeOfDay("HH:mm", timeStr: section.endTime) else {
+                return nil
+            }
+            return (section, start, end)
+        }
+        .sorted { lhs, rhs in
+            if lhs.section.sectionIndex != rhs.section.sectionIndex {
+                return lhs.section.sectionIndex < rhs.section.sectionIndex
+            }
+            return lhs.start < rhs.start
+        }
+
+        guard let firstSection = resolvedSections.first,
+              let lastSection = resolvedSections.last,
+              now >= firstSection.start,
+              now <= lastSection.end else {
+            return nil
+        }
+
+        if let currentSection = resolvedSections.first(where: { now >= $0.start && now <= $0.end }) {
+            return currentSection.section
+        }
+
+        return resolvedSections.first(where: { now < $0.start })?.section
+    }
+
+    func referenceSectionIndex(for now: Date = .now) -> Int? {
+        referenceSection(for: now)?.sectionIndex
     }
 }

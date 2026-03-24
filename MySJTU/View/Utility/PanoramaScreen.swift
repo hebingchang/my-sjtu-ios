@@ -412,9 +412,11 @@ struct PanoramaNativeView: UIViewRepresentable {
         private var useGyroscope = true
 
         private var motionReferenceAttitude: CMAttitude?
-        private var motionReferenceLookDirection = SIMD3<Float>(0, 0, -1)
+        private var motionReferenceCameraOrientation = simd_quatf(
+            angle: 0,
+            axis: SIMD3<Float>(0, 1, 0)
+        )
         private var motionReferenceYaw: Float = 0
-        private var motionReferencePitch: Float = 0
 
         private var motionBaseYaw: Float = 0
         private var motionBasePitch: Float = 0
@@ -474,12 +476,11 @@ struct PanoramaNativeView: UIViewRepresentable {
         private func handleDeviceMotion(_ motion: CMDeviceMotion) {
             guard useGyroscope else { return }
 
-            // 第一次收到数据时，记住“当前设备姿态”和“当前全景视线方向”
+            // 第一次收到数据时，记住“当前设备姿态”和“当前全景相机朝向”
             if motionReferenceAttitude == nil {
                 motionReferenceAttitude = motion.attitude.copy() as? CMAttitude
-                motionReferenceLookDirection = worldDirection(pan: yaw, tilt: pitch)
+                motionReferenceCameraOrientation = cameraOrientation(pan: yaw, tilt: pitch)
                 motionReferenceYaw = yaw
-                motionReferencePitch = pitch
             }
 
             guard
@@ -500,19 +501,19 @@ struct PanoramaNativeView: UIViewRepresentable {
                 r:  Float(q.w)
             )
 
-            // 用相对旋转去转动“起始视线方向”
+            // 在相机局部坐标里组合姿态，避免俯仰方向跟起始 pan 耦合。
+            let currentOrientation = simd_normalize(
+                motionReferenceCameraOrientation * relativeRotation
+            )
             let lookDirection = normalize(
-                relativeRotation.act(motionReferenceLookDirection)
+                currentOrientation.act(SIMD3<Float>(0, 0, -1))
             )
 
             let target = yawPitchFromDirection(lookDirection)
             let yawDelta = shortestAngleDelta(from: motionReferenceYaw, to: target.yaw)
-            let pitchDelta = target.pitch - motionReferencePitch
 
             motionBaseYaw = motionReferenceYaw + yawDelta
-            // Panorama uses the opposite sign convention for vertical look changes,
-            // so we invert only the motion delta to keep the initial view stable.
-            motionBasePitch = motionReferencePitch - pitchDelta
+            motionBasePitch = target.pitch
 
             yaw = motionBaseYaw + gestureYawOffset
             pitch = motionBasePitch + gesturePitchOffset
@@ -1443,6 +1444,19 @@ struct PanoramaNativeView: UIViewRepresentable {
             let len = sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
             guard len > 0.0001 else { return SIMD3<Float>(0, 0, -1) }
             return v / len
+        }
+
+        private func cameraOrientation(pan: Float, tilt: Float) -> simd_quatf {
+            let yaw = simd_quatf(
+                angle: -pan.radians,
+                axis: SIMD3<Float>(0, 1, 0)
+            )
+            let pitch = simd_quatf(
+                angle: -tilt.radians,
+                axis: SIMD3<Float>(1, 0, 0)
+            )
+
+            return simd_normalize(yaw * pitch)
         }
 
         private func panoramaLevelingOrientation() -> simd_quatf {

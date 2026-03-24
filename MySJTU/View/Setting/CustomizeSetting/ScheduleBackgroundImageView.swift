@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import WidgetKit
 
 struct ScheduleBackgroundImageView: View {
     private enum StorageError: LocalizedError {
@@ -430,5 +431,668 @@ struct ScheduleBackgroundImageView: View {
 #Preview {
     NavigationStack {
         ScheduleBackgroundImageView()
+    }
+}
+
+private enum WidgetBackgroundStorageError: LocalizedError {
+    case sharedContainerUnavailable
+    case imageEncodeFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .sharedContainerUnavailable:
+            return "无法访问小组件共享目录。"
+        case .imageEncodeFailed:
+            return "图片保存失败，请尝试重新选择。"
+        }
+    }
+}
+
+private enum WidgetBackgroundStorage {
+    private static let imageCompressionQuality: CGFloat = 0.88
+    private static let maximumImagePixelLength: CGFloat = 1800
+
+    static func imageURL(for filename: String) -> URL? {
+        SharedContainerDirectory.widgetBackgroundURL(for: filename)
+    }
+
+    static func image(for filename: String) -> UIImage? {
+        guard let imageURL = imageURL(for: filename) else { return nil }
+        return UIImage(contentsOfFile: imageURL.path)
+    }
+
+    static func save(
+        _ image: UIImage,
+        for slot: WidgetBackgroundSlot,
+        replacing previousFilename: String
+    ) throws -> String {
+        let fileManager = FileManager.default
+
+        guard let directoryURL = SharedContainerDirectory.widgetBackgroundsURL(fileManager: fileManager) else {
+            throw WidgetBackgroundStorageError.sharedContainerUnavailable
+        }
+
+        try fileManager.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+
+        let preparedImage = prepareForStorage(image)
+
+        guard let imageData = preparedImage.jpegData(compressionQuality: imageCompressionQuality) else {
+            throw WidgetBackgroundStorageError.imageEncodeFailed
+        }
+
+        let newFilename = "widget-background-\(slot.rawValue)-\(UUID().uuidString).jpg"
+        let destinationURL = directoryURL.appendingPathComponent(newFilename, isDirectory: false)
+
+        try imageData.write(to: destinationURL, options: .atomic)
+
+        if let previousURL = imageURL(for: previousFilename),
+           fileManager.fileExists(atPath: previousURL.path) {
+            try? fileManager.removeItem(at: previousURL)
+        }
+
+        return newFilename
+    }
+
+    static func remove(filename: String) throws {
+        guard let imageURL = imageURL(for: filename) else { return }
+
+        if FileManager.default.fileExists(atPath: imageURL.path) {
+            try FileManager.default.removeItem(at: imageURL)
+        }
+    }
+
+    private static func prepareForStorage(_ image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+
+        let width = CGFloat(cgImage.width)
+        let height = CGFloat(cgImage.height)
+        let longestSide = max(width, height)
+
+        guard longestSide > maximumImagePixelLength else { return image }
+
+        let scale = maximumImagePixelLength / longestSide
+        let targetSize = CGSize(width: width * scale, height: height * scale)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+
+        return UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+            UIImage(
+                cgImage: cgImage,
+                scale: image.scale,
+                orientation: image.imageOrientation
+            )
+            .draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+    }
+}
+
+private extension WidgetBackgroundSlot {
+    static let listIndicatorContainerWidth: CGFloat = 52
+
+    var previewDesignSize: CGSize {
+        switch self {
+        case .systemSmall:
+            return CGSize(width: 170, height: 170)
+        case .systemMedium:
+            return CGSize(width: 364, height: 170)
+        case .systemLarge:
+            return CGSize(width: 364, height: 382)
+        }
+    }
+
+    var listIndicatorWidth: CGFloat {
+        switch self {
+        case .systemSmall:
+            return 26
+        case .systemMedium:
+            return 44
+        case .systemLarge:
+            return 36
+        }
+    }
+
+    var listIndicatorSize: CGSize {
+        CGSize(width: listIndicatorWidth, height: listIndicatorWidth / aspectRatio)
+    }
+
+    private static var editorPreviewScale: CGFloat {
+        let largestWidgetSize = systemLarge.previewDesignSize
+        let maxPreviewWidth = min(UIScreen.main.bounds.width - 36, 340)
+        let maxPreviewHeight = min(UIScreen.main.bounds.height * 0.42, 360)
+
+        return min(
+            maxPreviewWidth / largestWidgetSize.width,
+            maxPreviewHeight / largestWidgetSize.height
+        )
+    }
+
+    var editorPreviewSize: CGSize {
+        CGSize(
+            width: previewDesignSize.width * Self.editorPreviewScale,
+            height: previewDesignSize.height * Self.editorPreviewScale
+        )
+    }
+
+    var cropSize: CGSize {
+        let screenWidth = UIScreen.main.bounds.width
+
+        switch self {
+        case .systemSmall:
+            let width = min(screenWidth - 56, 300)
+            return CGSize(width: width, height: width)
+        case .systemMedium:
+            let width = min(screenWidth - 36, 340)
+            return CGSize(width: width, height: width / aspectRatio)
+        case .systemLarge:
+            let height = min(UIScreen.main.bounds.height * 0.42, 340)
+            return CGSize(width: height * aspectRatio, height: height)
+        }
+    }
+
+    var cornerRadius: CGFloat {
+        30
+    }
+
+    var previewTitle: String {
+        switch self {
+        case .systemSmall:
+            return "适合把下一节课的简略信息放在桌面最醒目的位置。"
+        case .systemMedium:
+            return "适合横向排布，信息密度和留白比较平衡。"
+        case .systemLarge:
+            return "适合展示更多课程卡片，同时保留背景氛围。"
+        }
+    }
+}
+
+struct WidgetBackgroundImageSettingsView: View {
+    var body: some View {
+        List {
+            Section {
+                ForEach(WidgetBackgroundSlot.allCases) { slot in
+                    NavigationLink {
+                        WidgetBackgroundSlotEditorView(slot: slot)
+                    } label: {
+                        WidgetBackgroundSlotRow(slot: slot)
+                    }
+                }
+            } header: {
+                Text("尺寸")
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("可分别为桌面上的小号、中号和大号课程小组件设置背景。为了保持锁屏、待机和系统清透/着色模式下的可读性，配件类小组件仍会使用系统背景。")
+                    Text("建议选择主体简洁、明暗对比不过强的图片，这样课程信息会更清晰。")
+                }
+                .font(.footnote)
+                .foregroundStyle(Color(UIColor.secondaryLabel))
+            }
+        }
+        .navigationTitle("桌面小组件背景")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct WidgetBackgroundSlotRow: View {
+    let slot: WidgetBackgroundSlot
+
+    @AppStorage private var storedFilename: String
+
+    init(slot: WidgetBackgroundSlot) {
+        self.slot = slot
+        _storedFilename = AppStorage(
+            wrappedValue: "",
+            slot.storageKey,
+            store: UserDefaults.shared
+        )
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            WidgetBackgroundSizeIndicator(slot: slot)
+                .frame(
+                    width: WidgetBackgroundSlot.listIndicatorContainerWidth,
+                    alignment: .leading
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(slot.title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color(UIColor.label))
+
+                Text(slot.subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(Color(UIColor.secondaryLabel))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(storedFilename.isEmpty ? "未设置" : "已设置")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    storedFilename.isEmpty
+                    ? Color(UIColor.secondaryLabel)
+                    : Color("AccentColor")
+                )
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+private struct WidgetBackgroundSizeIndicator: View {
+    let slot: WidgetBackgroundSlot
+
+    private var size: CGSize {
+        slot.listIndicatorSize
+    }
+
+    private var cornerRadius: CGFloat {
+        max(8, min(size.width, size.height) * 0.28)
+    }
+
+    private var contentInset: CGFloat {
+        max(4, min(size.width, size.height) * 0.18)
+    }
+
+    private var markerSize: CGFloat {
+        max(4, min(size.width, size.height) * 0.16)
+    }
+
+    private var lineHeight: CGFloat {
+        max(2.5, min(size.width, size.height) * 0.1)
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(Color(UIColor.secondarySystemFill))
+
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(Color(UIColor.separator).opacity(0.42))
+
+            VStack(alignment: .leading, spacing: lineHeight) {
+                RoundedRectangle(cornerRadius: markerSize * 0.35, style: .continuous)
+                    .fill(Color("AccentColor").opacity(0.35))
+                    .frame(width: markerSize, height: markerSize)
+
+                Spacer(minLength: 0)
+
+                Capsule()
+                    .fill(Color(UIColor.secondaryLabel).opacity(0.18))
+                    .frame(width: size.width * 0.5, height: lineHeight)
+
+                Capsule()
+                    .fill(Color(UIColor.secondaryLabel).opacity(0.1))
+                    .frame(width: size.width * 0.32, height: lineHeight)
+            }
+            .padding(contentInset)
+        }
+        .frame(width: size.width, height: size.height)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct WidgetBackgroundSlotEditorView: View {
+    let slot: WidgetBackgroundSlot
+
+    @AppStorage private var storedFilename: String
+    @AppStorage private var backgroundTransparency: Double
+    @AppStorage private var backgroundBlurRadius: Double
+    @State private var showImagePicker = false
+    @State private var pickedImage: UIImage?
+    @State private var errorMessage: String?
+    @State private var reloadTimelinesTask: Task<Void, Never>?
+
+    init(slot: WidgetBackgroundSlot) {
+        self.slot = slot
+        _storedFilename = AppStorage(
+            wrappedValue: "",
+            slot.storageKey,
+            store: UserDefaults.shared
+        )
+        _backgroundTransparency = AppStorage(
+            wrappedValue: WidgetBackgroundEffectConfiguration.defaultTransparency,
+            slot.transparencyKey,
+            store: UserDefaults.shared
+        )
+        _backgroundBlurRadius = AppStorage(
+            wrappedValue: WidgetBackgroundEffectConfiguration.defaultBlurRadius,
+            slot.blurRadiusKey,
+            store: UserDefaults.shared
+        )
+    }
+
+    private var previewImage: UIImage? {
+        WidgetBackgroundStorage.image(for: storedFilename)
+    }
+
+    private var backgroundEffect: WidgetBackgroundEffectConfiguration {
+        .init(
+            transparency: backgroundTransparency,
+            blurRadius: backgroundBlurRadius
+        )
+    }
+
+    private var transparencyText: String {
+        "\(Int((backgroundEffect.clampedTransparency * 100).rounded()))%"
+    }
+
+    private var blurRadiusText: String {
+        "\(Int(backgroundEffect.clampedBlurRadius.rounded()))"
+    }
+
+    private var usesDefaultSettings: Bool {
+        backgroundEffect.usesDefaultValues
+    }
+
+    private var previewSummaryTitle: String {
+        storedFilename.isEmpty ? "还没有设置背景图片" : "背景图片已准备好"
+    }
+
+    private var previewSummaryText: String {
+        if storedFilename.isEmpty {
+            return "选择一张图片后，会按\(slot.title)的比例裁切并直接用于桌面预览。"
+        }
+
+        return "新的背景会应用到\(slot.title)，并尽量保持当前小组件的信息卡片风格不变。"
+    }
+
+    private func beginImageSelection() {
+        showImagePicker = true
+    }
+
+    private func scheduleDebouncedWidgetReload() {
+        reloadTimelinesTask?.cancel()
+        reloadTimelinesTask = Task {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+        }
+    }
+
+    private func reloadWidgetTimelines() {
+        reloadTimelinesTask?.cancel()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func resetEffect() {
+        backgroundTransparency = WidgetBackgroundEffectConfiguration.defaultTransparency
+        backgroundBlurRadius = WidgetBackgroundEffectConfiguration.defaultBlurRadius
+    }
+
+    private func replaceBackgroundImage(with image: UIImage) {
+        do {
+            let newFilename = try WidgetBackgroundStorage.save(
+                image,
+                for: slot,
+                replacing: storedFilename
+            )
+            storedFilename = newFilename
+            reloadWidgetTimelines()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func removeBackgroundImage() {
+        do {
+            try WidgetBackgroundStorage.remove(filename: storedFilename)
+            storedFilename = ""
+            reloadWidgetTimelines()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 16) {
+                    WidgetBackgroundPreviewCard(
+                        slot: slot,
+                        image: previewImage,
+                        effect: backgroundEffect,
+                        size: slot.editorPreviewSize
+                    )
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        beginImageSelection()
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(previewSummaryTitle)
+                            .font(.headline)
+                            .foregroundStyle(Color(UIColor.label))
+
+                        Text(previewSummaryText)
+                            .font(.subheadline)
+                            .foregroundStyle(Color(UIColor.secondaryLabel))
+
+                        Label("点按上方预览即可重新裁切或更换图片", systemImage: "hand.tap.fill")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Color("AccentColor"))
+                            .padding(.top, 2)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .listRowBackground(Color.clear)
+
+            Section("操作") {
+                Button {
+                    beginImageSelection()
+                } label: {
+                    Label(storedFilename.isEmpty ? "选择背景图片" : "更换背景图片", systemImage: "photo")
+                }
+
+                if !storedFilename.isEmpty {
+                    Button(role: .destructive) {
+                        removeBackgroundImage()
+                    } label: {
+                        Label("移除背景图片", systemImage: "trash")
+                    }
+                }
+            }
+
+            Section {
+                effectSliderRow(
+                    title: "透明度",
+                    valueText: transparencyText
+                ) {
+                    Slider(
+                        value: $backgroundTransparency,
+                        in: WidgetBackgroundEffectConfiguration.transparencyRange
+                    )
+                }
+
+                effectSliderRow(
+                    title: "模糊强度",
+                    valueText: blurRadiusText
+                ) {
+                    Slider(
+                        value: $backgroundBlurRadius,
+                        in: WidgetBackgroundEffectConfiguration.blurRadiusRange,
+                        step: 1
+                    )
+                }
+
+                Button {
+                    resetEffect()
+                } label: {
+                    Label("恢复默认效果", systemImage: "arrow.counterclockwise")
+                }
+                .disabled(usesDefaultSettings)
+            } header: {
+                Text("效果")
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(slot.previewTitle)
+                    Text("背景层会自动增加轻微模糊和遮罩，以保证课程标题、地点和时间在照片上依然清晰。")
+                }
+                .font(.footnote)
+                .foregroundStyle(Color(UIColor.secondaryLabel))
+            }
+        }
+        .navigationTitle(slot.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .alert(
+            "无法设置背景图片",
+            isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )
+        ) {
+            Button("好") {
+                errorMessage = nil
+            }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+        .cropImagePicker(
+            cropType: .roundedRectangle(
+                size: slot.cropSize,
+                cornerRadius: slot.cornerRadius,
+                style: .continuous
+            ),
+            show: $showImagePicker,
+            croppedImage: $pickedImage
+        )
+        .onChange(of: pickedImage) { _, newImage in
+            guard let newImage else { return }
+            replaceBackgroundImage(with: newImage)
+            pickedImage = nil
+        }
+        .onChange(of: backgroundTransparency) { _, _ in
+            scheduleDebouncedWidgetReload()
+        }
+        .onChange(of: backgroundBlurRadius) { _, _ in
+            scheduleDebouncedWidgetReload()
+        }
+    }
+
+    private func effectSliderRow<Control: View>(
+        title: String,
+        valueText: String,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(valueText)
+                    .foregroundStyle(Color(UIColor.secondaryLabel))
+                    .monospacedDigit()
+            }
+
+            control()
+        }
+    }
+}
+
+private struct WidgetBackgroundPreviewCard: View {
+    let slot: WidgetBackgroundSlot
+    let image: UIImage?
+    let effect: WidgetBackgroundEffectConfiguration
+    let size: CGSize
+    var showsSelectionPrompt = true
+
+    private var designSize: CGSize {
+        slot.previewDesignSize
+    }
+
+    private var scale: CGFloat {
+        min(size.width / designSize.width, size.height / designSize.height)
+    }
+
+    var body: some View {
+        previewBody
+            .frame(width: designSize.width, height: designSize.height)
+            .scaleEffect(scale)
+            .frame(width: size.width, height: size.height)
+    }
+
+    private var previewBody: some View {
+        WidgetBackgroundCanvas(
+            slot: slot,
+            image: image,
+            effect: effect,
+            showsSelectionPrompt: showsSelectionPrompt
+        )
+        .clipShape(RoundedRectangle(cornerRadius: slot.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: slot.cornerRadius, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.12))
+        }
+        .shadow(color: Color.black.opacity(0.08), radius: 16, y: 8)
+    }
+}
+
+private struct WidgetBackgroundCanvas: View {
+    let slot: WidgetBackgroundSlot
+    let image: UIImage?
+    let effect: WidgetBackgroundEffectConfiguration
+    var showsSelectionPrompt = true
+
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(effect.imageOpacity)
+                    .blur(radius: effect.clampedBlurRadius)
+                    .scaleEffect(1.05)
+                    .overlay {
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(UIColor.systemBackground).opacity(effect.topOverlayOpacity),
+                                        Color(UIColor.systemBackground).opacity(effect.middleOverlayOpacity),
+                                        Color(UIColor.systemBackground).opacity(effect.bottomOverlayOpacity)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
+                    .overlay {
+                        Rectangle()
+                            .fill(Color(UIColor.systemBackground).opacity(effect.flatOverlayOpacity))
+                    }
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color("AccentColor").opacity(0.26),
+                        Color(UIColor.secondarySystemBackground),
+                        Color(UIColor.tertiarySystemBackground)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .overlay {
+                    if showsSelectionPrompt {
+                        VStack(spacing: 8) {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.title3.weight(.semibold))
+                            Text("选择背景图片")
+                                .font(.footnote.weight(.semibold))
+                        }
+                        .foregroundStyle(Color(UIColor.secondaryLabel))
+                    }
+                }
+            }
+        }
+    }
+}
+
+#Preview("Widget Background Settings") {
+    NavigationStack {
+        WidgetBackgroundImageSettingsView()
     }
 }

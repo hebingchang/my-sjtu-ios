@@ -541,18 +541,21 @@ struct WeekTabView: View {
 struct ScheduleVerticalScrollMetrics: Equatable {
     let contentOffsetY: CGFloat
     let maxContentOffsetY: CGFloat
+    let topContentOffsetY: CGFloat
 
-    static let zero = Self(contentOffsetY: 0, maxContentOffsetY: 0)
+    static let zero = Self(contentOffsetY: 0, maxContentOffsetY: 0, topContentOffsetY: 0)
 
-    init(contentOffsetY: CGFloat, maxContentOffsetY: CGFloat) {
+    init(contentOffsetY: CGFloat, maxContentOffsetY: CGFloat, topContentOffsetY: CGFloat) {
         self.contentOffsetY = contentOffsetY
         self.maxContentOffsetY = max(maxContentOffsetY, 0)
+        self.topContentOffsetY = topContentOffsetY
     }
 
     init(geometry: ScrollGeometry) {
         self.init(
             contentOffsetY: geometry.contentOffset.y,
-            maxContentOffsetY: geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom - geometry.containerSize.height
+            maxContentOffsetY: geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom - geometry.containerSize.height,
+            topContentOffsetY: -geometry.contentInsets.top
         )
     }
 }
@@ -1562,6 +1565,8 @@ struct WeekScheduleTabView: View {
 }
 
 struct ScheduleView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     private final class InteractionCache {
         var overlayGestureReferenceHeight: CGFloat?
         var dayVerticalScrollMetrics: [Date: ScheduleVerticalScrollMetrics] = [:]
@@ -1618,8 +1623,9 @@ struct ScheduleView: View {
     private let weekLabelOverlayHeight: CGFloat = 56
     private let weekLabelOverlayAnimation: Animation = .easeInOut(duration: 0.18)
     private let weekLabelGestureToggleDistance: CGFloat = 18
-    private let weekLabelTopRevealContentOffsetY: CGFloat = -62
+    private let weekLabelTopContentOffsetTolerance: CGFloat = 0.5
     private let weekLabelOverlayTopSpacing: CGFloat = 0
+    private let bottomSystemGestureExclusionPadding: CGFloat = 16
     private let titleBackdropOverflowHeight: CGFloat = 24
     private let scheduleContentFadeHeight: CGFloat = 36
     private let scheduleContentBottomInsetAdjustment: CGFloat = 0
@@ -1662,19 +1668,40 @@ struct ScheduleView: View {
         isWeekLabelOverlayVisible = isVisible
     }
 
-    private func revealWeekLabelOverlayWhenAtTop(contentOffsetY: CGFloat) {
-        guard contentOffsetY <= weekLabelTopRevealContentOffsetY else { return }
+    private func isScheduleContentAtTop(_ metrics: ScheduleVerticalScrollMetrics) -> Bool {
+        abs(metrics.contentOffsetY - metrics.topContentOffsetY) <= weekLabelTopContentOffsetTolerance
+    }
+
+    private func forceWeekLabelOverlayVisibleWhenScrollViewAtTop(_ metrics: ScheduleVerticalScrollMetrics) {
+        guard isScheduleContentAtTop(metrics) else { return }
         setWeekLabelOverlayVisibility(true)
     }
 
-    private func handleScheduleContentDragChanged(_ value: DragGesture.Value) {
+    private func isBottomSystemGesture(_ value: DragGesture.Value, containerHeight: CGFloat, bottomSafeAreaInset: CGFloat) -> Bool {
+        guard bottomSafeAreaInset > 0 else { return false }
+        let exclusionHeight = bottomSafeAreaInset + bottomSystemGestureExclusionPadding
+        return value.startLocation.y >= containerHeight - exclusionHeight
+    }
+
+    private func handleScheduleContentDragChanged(_ value: DragGesture.Value, containerHeight: CGFloat, bottomSafeAreaInset: CGFloat) {
         guard autoHideWeekLabelOverlay else {
             resetWeekLabelOverlayTracking()
             return
         }
 
+        guard !isBottomSystemGesture(value, containerHeight: containerHeight, bottomSafeAreaInset: bottomSafeAreaInset) else {
+            resetWeekLabelOverlayTracking(showOverlay: false)
+            return
+        }
+
         let translation = value.translation
         guard abs(translation.height) > abs(translation.width) else { return }
+
+        if isScheduleContentAtTop(currentVerticalScrollMetrics) {
+            setWeekLabelOverlayVisibility(true)
+            interactionCache.overlayGestureReferenceHeight = translation.height
+            return
+        }
 
         guard let referenceHeight = interactionCache.overlayGestureReferenceHeight else {
             interactionCache.overlayGestureReferenceHeight = translation.height
@@ -1710,7 +1737,7 @@ struct ScheduleView: View {
         interactionCache.dayVerticalScrollMetrics[day.startOfDay()] = metrics
         guard day.isSameDay(as: selectedDay) else { return }
         currentVerticalScrollMetrics = metrics
-        revealWeekLabelOverlayWhenAtTop(contentOffsetY: metrics.contentOffsetY)
+        forceWeekLabelOverlayVisibleWhenScrollViewAtTop(metrics)
     }
 
     private func resetWeekLabelOverlayTracking(showOverlay: Bool = true) {
@@ -1754,7 +1781,7 @@ struct ScheduleView: View {
             } action: { _, value in
                 interactionCache.weekVerticalScrollMetrics = value
                 currentVerticalScrollMetrics = value
-                revealWeekLabelOverlayWhenAtTop(contentOffsetY: value.contentOffsetY)
+                forceWeekLabelOverlayVisibleWhenScrollViewAtTop(value)
             }
         }
     }
@@ -1993,7 +2020,11 @@ struct ScheduleView: View {
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 3)
                             .onChanged { value in
-                                handleScheduleContentDragChanged(value)
+                                handleScheduleContentDragChanged(
+                                    value,
+                                    containerHeight: geometry.size.height,
+                                    bottomSafeAreaInset: geometry.safeAreaInsets.bottom
+                                )
                             }
                             .onEnded { _ in
                                 handleScheduleContentDragEnded()
@@ -2025,7 +2056,7 @@ struct ScheduleView: View {
                 let key = selectedDay.startOfDay()
                 if let metrics = interactionCache.dayVerticalScrollMetrics[key] {
                     currentVerticalScrollMetrics = metrics
-                    revealWeekLabelOverlayWhenAtTop(contentOffsetY: metrics.contentOffsetY)
+                    forceWeekLabelOverlayVisibleWhenScrollViewAtTop(metrics)
                 } else {
                     currentVerticalScrollMetrics = .zero
                     // 日期切换后该页若尚未产生纵向滚动回调，先确保 overlay 可见，避免残留隐藏状态。
@@ -2039,6 +2070,11 @@ struct ScheduleView: View {
         }
         .onChange(of: autoHideWeekLabelOverlay) {
             resetWeekLabelOverlayTracking()
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase != .active {
+                resetWeekLabelOverlayTracking(showOverlay: false)
+            }
         }
         .sheet(item: $selectedSchedule) { detail in
             NavigationView {

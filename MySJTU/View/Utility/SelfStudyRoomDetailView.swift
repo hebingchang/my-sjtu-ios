@@ -34,7 +34,6 @@ struct SelfStudyRoomDetailView: View {
     let sections: [SelfStudyClassroomAPI.SectionTime]
     let currentSectionIndex: Int?
     let closedSections: Set<Int>
-    let authCookies: [HTTPCookie]
 
     @State private var hasLoadedRoomDetails = false
     @State private var loadingRoomDetails = false
@@ -49,18 +48,22 @@ struct SelfStudyRoomDetailView: View {
     @State private var roomEnvironmental: SelfStudyClassroomAPI.RoomEnvironmental?
     @State private var lastEnvironmentUpdatedAt: Date?
 
+    private var effectiveCurrentSectionIndex: Int? {
+        currentSectionIndex ?? sections.referenceSectionIndex()
+    }
+
     private var currentSection: SelfStudyClassroomAPI.SectionTime? {
-        guard let currentSectionIndex else {
+        guard let effectiveCurrentSectionIndex else {
             return nil
         }
-        return sections.first { $0.sectionIndex == currentSectionIndex }
+        return sections.first { $0.sectionIndex == effectiveCurrentSectionIndex }
     }
 
     private var currentStatus: SelfStudyRoomSectionStatus {
-        guard let currentSectionIndex else {
+        guard let effectiveCurrentSectionIndex else {
             return .free
         }
-        return status(at: currentSectionIndex)
+        return status(at: effectiveCurrentSectionIndex)
     }
 
     private var displayAttributes: [SelfStudyClassroomAPI.RoomAttribute] {
@@ -94,6 +97,30 @@ struct SelfStudyRoomDetailView: View {
         }
     }
 
+    private var isInitialRoomDetailsLoading: Bool {
+        loadingRoomDetails && !hasLoadedRoomDetails
+    }
+
+    private var hasRoomDetailsError: Bool {
+        roomDetailsErrorMessage?.isEmpty == false
+    }
+
+    private var hasEnvironmentError: Bool {
+        environmentErrorMessage?.isEmpty == false
+    }
+
+    private var shouldShowEnvironmentSection: Bool {
+        isInitialRoomDetailsLoading || !environmentMetrics.isEmpty || hasEnvironmentError
+    }
+
+    private var shouldShowFacilitySection: Bool {
+        isInitialRoomDetailsLoading || panoramaXMLURL != nil || !displayAttributes.isEmpty || hasRoomDetailsError
+    }
+
+    private var shouldShowDetailNavigationSection: Bool {
+        shouldShowEnvironmentSection || shouldShowFacilitySection
+    }
+
     var body: some View {
         List {
             overviewSection
@@ -114,64 +141,66 @@ struct SelfStudyRoomDetailView: View {
         }
     }
 
+    @ViewBuilder
     private var detailNavigationSection: some View {
-        Section("详细信息") {
-            NavigationLink {
-                List {
-                    environmentSection
-                    panoramaSection
-                    facilitySection
+        if shouldShowDetailNavigationSection {
+            Section("详细信息") {
+                NavigationLink {
+                    List {
+                        if shouldShowEnvironmentSection {
+                            environmentSection
+                        }
+                        if shouldShowFacilitySection {
+                            facilitySection
+                        }
+                    }
+                    .navigationTitle("环境与设施")
+                    .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    detailEntryRow(
+                        title: "环境与设施",
+                        subtitle: envFacilitySummaryText,
+                        symbol: "square.grid.2x2.fill",
+                        tint: .teal
+                    )
                 }
-                .navigationTitle("环境与设施")
-                .navigationBarTitleDisplayMode(.inline)
-            } label: {
-                detailEntryRow(
-                    title: "环境与设施",
-                    subtitle: envFacilitySummaryText,
-                    symbol: "square.grid.2x2.fill",
-                    tint: .teal
-                )
             }
         }
     }
 
     private var environmentSummaryText: String {
-        if loadingRoomDetails && !hasLoadedRoomDetails {
-            return "加载中..."
+        guard let firstMetric = environmentMetrics.first else {
+            return ""
         }
 
-        guard let roomEnvironmental else {
-            if let environmentErrorMessage, !environmentErrorMessage.isEmpty {
-                return "加载失败"
-            }
-            return "暂无数据"
-        }
-
-        guard roomEnvironmental.hasSensor else {
-            return "未接入传感器"
-        }
-
-        if let firstMetric = environmentMetrics.first {
-            return "\(firstMetric.title) \(firstMetric.valueText)"
-        }
-        return "已接入，暂无可展示数据"
+        return "\(firstMetric.title) \(firstMetric.valueText)"
     }
 
     private var envFacilitySummaryText: String {
-        if loadingRoomDetails && !hasLoadedRoomDetails {
+        if isInitialRoomDetailsLoading {
             return "加载中..."
         }
 
-        let environmentPart = environmentSummaryText
-        let facilityPart: String = {
-            var tags: [String] = []
-            if !displayAttributes.isEmpty {
-                tags.append("\(displayAttributes.count)项")
-            }
-            return tags.isEmpty ? "设施暂无" : "设施\(tags.joined(separator: " · "))"
-        }()
+        var parts: [String] = []
 
-        return "\(environmentPart) · \(facilityPart)"
+        if !environmentSummaryText.isEmpty {
+            parts.append(environmentSummaryText)
+        }
+        if panoramaXMLURL != nil {
+            parts.append("360° 全景")
+        }
+        if !displayAttributes.isEmpty {
+            parts.append("设施\(displayAttributes.count)项")
+        }
+
+        if parts.isEmpty {
+            return hasEnvironmentError || hasRoomDetailsError ? "加载失败" : "暂无详细信息"
+        }
+
+        if hasEnvironmentError || hasRoomDetailsError {
+            parts.append("部分加载失败")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private var overviewSection: some View {
@@ -206,39 +235,6 @@ struct SelfStudyRoomDetailView: View {
                 }
             }
             .padding(.vertical, 4)
-        }
-    }
-
-    @ViewBuilder
-    private var panoramaSection: some View {
-        Section("教室设施") {
-            if loadingRoomDetails && !hasLoadedRoomDetails {
-                loadingRow(text: "正在加载全景数据...")
-            } else if let panoramaXMLURL {
-                panoramaPreviewCard
-                    .background(
-                        NavigationLink("") {
-                            PanoramaScreen(
-                                xmlURL: panoramaXMLURL,
-                                title: "\(room.name) 360°全景"
-                            )
-                        }
-                            .opacity(0)
-                    )
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                
-                
-                if let panoramaPreviewErrorMessage, !panoramaPreviewErrorMessage.isEmpty {
-                    Text("预览加载失败，可直接进入全景查看。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Text("该教室暂无全景数据")
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
@@ -301,13 +297,32 @@ struct SelfStudyRoomDetailView: View {
 
     @ViewBuilder
     private var facilitySection: some View {
-        Section {
-            if loadingRoomDetails && !hasLoadedRoomDetails {
+        Section("教室设施") {
+            if isInitialRoomDetailsLoading {
                 loadingRow(text: "正在加载教室设施...")
-            } else if displayAttributes.isEmpty {
-                Text("暂无可展示的教室属性")
-                    .foregroundStyle(.secondary)
             } else {
+                if let panoramaXMLURL {
+                    panoramaPreviewCard
+                        .background(
+                            NavigationLink("") {
+                                PanoramaScreen(
+                                    xmlURL: panoramaXMLURL,
+                                    title: "\(room.name) 360°全景"
+                                )
+                            }
+                                .opacity(0)
+                        )
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+
+                    if let panoramaPreviewErrorMessage, !panoramaPreviewErrorMessage.isEmpty {
+                        Text("预览加载失败，可直接进入全景查看。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 ForEach(displayAttributes) { attribute in
                     LabeledContent(attribute.name) {
                         Text(attribute.value)
@@ -332,21 +347,8 @@ struct SelfStudyRoomDetailView: View {
     @ViewBuilder
     private var environmentSection: some View {
         Section {
-            if loadingRoomDetails && !hasLoadedRoomDetails {
+            if isInitialRoomDetailsLoading {
                 loadingRow(text: "正在加载环境数据...")
-            } else if let roomEnvironmental {
-                if roomEnvironmental.hasSensor {
-                    if environmentMetrics.isEmpty {
-                        Text("该教室已接入环境传感器，但暂无可展示数据。")
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Text("该教室暂未接入环境传感器。")
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Text("暂无实时环境数据。")
-                    .foregroundStyle(.secondary)
             }
 
             if let environmentErrorMessage, !environmentErrorMessage.isEmpty {
@@ -373,11 +375,14 @@ struct SelfStudyRoomDetailView: View {
                 .font(.footnote)
                 .foregroundStyle(.tint)
                 .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.vertical, 0)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(refreshingEnvironment || authCookies.isEmpty)
+            .disabled(refreshingEnvironment)
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets())
+            .environment(\.defaultMinListRowHeight, 1)
         } header: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
@@ -598,13 +603,7 @@ struct SelfStudyRoomDetailView: View {
             return
         }
 
-        guard !authCookies.isEmpty else {
-            roomDetailsErrorMessage = "未找到可用账号，请重新登录 jAccount 后重试。"
-            hasLoadedRoomDetails = true
-            return
-        }
-
-        let api = SelfStudyClassroomAPI(cookies: authCookies)
+        let api = SelfStudyClassroomAPI()
 
         loadingRoomDetails = true
         roomDetailsErrorMessage = nil
@@ -718,12 +717,7 @@ struct SelfStudyRoomDetailView: View {
 
     @MainActor
     private func refreshEnvironmentData() async {
-        guard !authCookies.isEmpty else {
-            environmentErrorMessage = "未找到可用账号，请重新登录 jAccount 后重试。"
-            return
-        }
-
-        let api = SelfStudyClassroomAPI(cookies: authCookies)
+        let api = SelfStudyClassroomAPI()
 
         refreshingEnvironment = true
         defer { refreshingEnvironment = false }
@@ -786,9 +780,9 @@ struct SelfStudyRoomDetailView: View {
         if let apiError = error as? APIError {
             switch apiError {
             case .sessionExpired:
-                return "登录状态已过期，请重新登录后再试。"
+                return "服务暂时不可用，请稍后重试。"
             case .noAccount:
-                return "未找到可用账号，请先登录 jAccount。"
+                return "服务暂时不可用，请稍后重试。"
             case .remoteError(let message):
                 return message
             case .runtimeError(let message):
@@ -829,8 +823,7 @@ struct SelfStudyRoomDetailView: View {
             room: room,
             sections: sections,
             currentSectionIndex: 2,
-            closedSections: [],
-            authCookies: []
+            closedSections: []
         )
     }
 }
