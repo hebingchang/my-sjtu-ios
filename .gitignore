@@ -90,5 +90,9 @@ Temporary Items
 .apdisk
 
 # misc
-.fleet
 apollo-ios-cli
+.cache
+.codex-home
+.tmp
+.swift-module-cache
+.deriveddata

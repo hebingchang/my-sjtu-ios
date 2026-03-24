@@ -22,6 +22,7 @@ private struct semester: Codable {
     let id: String
     let year, semester: Int
     let start_date, end_date: String
+    let name: String?
 }
 
 private struct semesterResponse: Codable {
@@ -30,9 +31,11 @@ private struct semesterResponse: Codable {
 }
 
 func getSemesters(college: College) async throws -> [Semester] {
-    let url = college == .sjtu ? "https://s3.jcloud.sjtu.edu.cn/9fd44bb76f604e8597acfcceada7cb83-tongqu/class_table/calendar.json"
-        :
-        "https://s3.jcloud.sjtu.edu.cn/9fd44bb76f604e8597acfcceada7cb83-tongqu/class_table/calendar_shsmu.json"
+    let url = switch college {
+    case .joint: "https://s3.jcloud.sjtu.edu.cn/9fd44bb76f604e8597acfcceada7cb83-tongqu/class_table/calendar_joint.json"
+    case .shsmu: "https://s3.jcloud.sjtu.edu.cn/9fd44bb76f604e8597acfcceada7cb83-tongqu/class_table/calendar_shsmu.json"
+    default: "https://s3.jcloud.sjtu.edu.cn/9fd44bb76f604e8597acfcceada7cb83-tongqu/class_table/calendar.json"
+    }
 
     let response = try await AF.request(
         url,
@@ -46,7 +49,8 @@ func getSemesters(college: College) async throws -> [Semester] {
     formatter.dateFormat = "yyyy-MM-dd"
 
     return response.semesters.map {
-        Semester(id: $0.id, college: college, year: $0.year, semester: $0.semester, start_at: Date.fromFormat("yyyy-MM-dd", dateStr: $0.start_date)!.startOfDay(), end_at: Date.fromFormat("yyyy-MM-dd", dateStr: $0.end_date)!.startOfDay().addDays(1).startOfDay())
+        Semester(id: $0.id, college: college, year: $0.year, semester: $0.semester, start_at: Date.fromFormat("yyyy-MM-dd", dateStr: $0.start_date)!.startOfDay(), end_at: Date.fromFormat("yyyy-MM-dd", dateStr: $0.end_date)!.startOfDay().addDays(1).startOfDay(),
+                 name: $0.name)
     }
 }
 
@@ -143,6 +147,71 @@ struct SHSMUOpenAPI {
     func getSchedules(semester: Semester, onProgress: (_ fraction: Double) -> Void) async throws -> [CourseClassSchedule] {
         let start = semester.start_at.formattedDate()
         let end = semester.end_at.formattedDate()
+        let calendarTableURL = "\(baseUrl)/Home/GetCalendarTable"
+        
+        func shouldRetryCalendarRequest(_ error: Error) -> Bool {
+            if let afError = error as? AFError {
+                switch afError {
+                case .sessionTaskFailed(let underlyingError):
+                    return shouldRetryCalendarRequest(underlyingError)
+                case .responseValidationFailed(let reason):
+                    if case .unacceptableStatusCode(let statusCode) = reason {
+                        return statusCode == 429 || (500...599).contains(statusCode)
+                    }
+                    return false
+                default:
+                    return false
+                }
+            }
+            
+            if let urlError = error as? URLError {
+                switch urlError.code {
+                case .timedOut, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed,
+                     .networkConnectionLost, .notConnectedToInternet, .cannotLoadFromNetwork:
+                    return true
+                default:
+                    return false
+                }
+            }
+            
+            return false
+        }
+        
+        func getCalendarTableWithRetry(
+            parameters: [String: String],
+            maxRetryCount: Int = 2
+        ) async throws -> [SHSMUCourse] {
+            var attempt = 0
+            var retryDelayInNanoseconds: UInt64 = 300_000_000
+            
+            while true {
+                do {
+                    return try await AF.request(
+                        calendarTableURL,
+                        parameters: parameters,
+                        encoding: URLEncoding(destination: .queryString)
+                    ).serializingDecodable([SHSMUCourse].self).value.sorted { $0.kcIndex < $1.kcIndex }
+                } catch {
+                    if error is CancellationError {
+                        throw error
+                    }
+                    
+                    guard attempt < maxRetryCount, shouldRetryCalendarRequest(error) else {
+                        throw error
+                    }
+                    
+                    attempt += 1
+                    try await Task.sleep(nanoseconds: retryDelayInNanoseconds)
+                    retryDelayInNanoseconds *= 2
+                }
+            }
+        }
+        
+        struct ScheduleTaskResult {
+            let listIndex: Int
+            let classID: String
+            let schedules: [Schedule]
+        }
                 
         cookies.forEach { cookie in
             AF.session.configuration.httpCookieStorage?.setCookie(cookie)
@@ -196,35 +265,67 @@ struct SHSMUOpenAPI {
             }
         }
         
+        let classIndexByID = Dictionary(uniqueKeysWithValues: classes.enumerated().map { item in
+            (item.element.class_.id, item.offset)
+        })
+        
+        let maxConcurrentRequests = 6
         var progress = 0
+        var scheduleTaskResults = Array<ScheduleTaskResult?>(repeating: nil, count: response.list.count)
         // initiate schedules
-        for schedule in response.list {
-            if let mcsid = schedule.mcsid,
-               let curriculumID = schedule.curriculumID {
-                let classIndex = classes.firstIndex(where: { $0.class_.id == String(curriculumID) })!
-                
-                let response = try await AF.request(
-                    "\(baseUrl)/Home/GetCalendarTable",
-                    parameters: [
-                        "MCSID": mcsid,
-                        "CSID": schedule.csid != nil ? String(schedule.csid!) : "null",
-                        "CurriculumID": String(curriculumID),
-                        "XXKMID": schedule.xxkmid != nil ? String(schedule.xxkmid!) : "null",
-                        "CurriculumType": schedule.curriculumType
-                    ],
-                    encoding: URLEncoding(destination: .queryString)
-                ).serializingDecodable([SHSMUCourse].self).value.sorted { $0.kcIndex < $1.kcIndex }
-                
-                
-                if let startPeriod = getPeriodByTime(college: .shsmu, time: String(schedule.start.split(separator: "T")[1])) {
-                    for i in 0..<schedule.courseCount {
-                        if let start = Date.fromFormat("yyyy-MM-dd'T'HH:mm:ss", dateStr: schedule.start, calendar: .iso8601) {
+        if response.list.isEmpty {
+            onProgress(1)
+            return classes
+        }
+        
+        for batchStart in stride(from: 0, to: response.list.count, by: maxConcurrentRequests) {
+            let batchEnd = min(batchStart + maxConcurrentRequests, response.list.count)
+            
+            try await withThrowingTaskGroup(of: ScheduleTaskResult?.self) { group in
+                for listIndex in batchStart..<batchEnd {
+                    let schedule = response.list[listIndex]
+                    
+                    group.addTask {
+                        guard let mcsid = schedule.mcsid,
+                              let curriculumID = schedule.curriculumID else {
+                            return nil
+                        }
+                        
+                        let classID = String(curriculumID)
+                        guard classIndexByID[classID] != nil else {
+                            return nil
+                        }
+                        
+                        let startParts = schedule.start.split(separator: "T")
+                        guard startParts.count > 1,
+                              let startPeriod = getPeriodByTime(college: .shsmu, time: String(startParts[1])),
+                              let start = Date.fromFormat("yyyy-MM-dd'T'HH:mm:ss", dateStr: schedule.start, calendar: .iso8601) else {
+                            return nil
+                        }
+                        
+                        let response = try await getCalendarTableWithRetry(
+                            parameters: [
+                                "MCSID": mcsid,
+                                "CSID": schedule.csid.map(String.init) ?? "null",
+                                "CurriculumID": classID,
+                                "XXKMID": schedule.xxkmid.map(String.init) ?? "null",
+                                "CurriculumType": schedule.curriculumType
+                            ]
+                        )
+                        
+                        var schedules: [Schedule] = []
+                        if schedule.courseCount > 0 {
+                            schedules.reserveCapacity(schedule.courseCount)
+                        }
+                        
+                        for i in 0..<schedule.courseCount {
                             var dbSchedule = Schedule(
-                                class_id: classes[classIndex].class_.id,
+                                class_id: classID,
                                 college: .shsmu,
                                 classroom: schedule.classroomAcademy.trimSpace(),
                                 day: (start.get(.weekday) + 5) % 7,
-                                period: (startPeriod.id >= 5 ? startPeriod.id + 1 : startPeriod.id) + i,
+                                // period: (startPeriod.id >= 5 ? startPeriod.id + 1 : startPeriod.id) + i,
+                                period: startPeriod.id + i,
                                 week: start.weeksSince(semester.start_at),
                                 is_start: i == 0,
                                 length: i == 0 ? schedule.courseCount : 0
@@ -239,14 +340,30 @@ struct SHSMUOpenAPI {
                                 }.joined(separator: "\n")
                             }
                             
-                            classes[classIndex].schedules.append(dbSchedule)
+                            schedules.append(dbSchedule)
                         }
+                        
+                        return ScheduleTaskResult(listIndex: listIndex, classID: classID, schedules: schedules)
                     }
                 }
+                
+                for try await result in group {
+                    if let result {
+                        scheduleTaskResults[result.listIndex] = result
+                    }
+                    
+                    progress += 1
+                    onProgress(Double(progress) / Double(response.list.count))
+                }
+            }
+        }
+        
+        for result in scheduleTaskResults.compactMap({ $0 }) {
+            guard let classIndex = classIndexByID[result.classID] else {
+                continue
             }
             
-            progress += 1
-            onProgress(Double(progress) / Double(response.list.count))
+            classes[classIndex].schedules.append(contentsOf: result.schedules)
         }
 
         return classes
@@ -448,6 +565,704 @@ struct SJTUGOpenAPI {
                     return retSchedule
                 },
                 remarks: remarks
+            )
+        }
+    }
+}
+
+struct JointOpenAPI {
+    var cookies: [HTTPCookie]
+    var tokens: [TokenForScopes]
+
+    private static let userInfoURL = "https://coursesel.umji.sjtu.edu.cn/sys/globalInfoByVersion_Login.action"
+    private static let termsURL = "https://coursesel.umji.sjtu.edu.cn/smd/findAllByCombo_Term.action"
+    private static let lessonTasksURL = "https://coursesel.umji.sjtu.edu.cn/tpm/findStudentLessonTask_LessonTask.action"
+    private static let schedulesURL = "https://coursesel.umji.sjtu.edu.cn/tpm/findWeekCalendar_LessonCalendar.action"
+
+    struct UserInfoResponse: Codable {
+        let session: Session
+        let version: Version
+    }
+
+    private struct UserInfoRequest: Codable {
+        let version: Version
+    }
+
+    private struct TermResponse: Codable {
+        let success: Bool
+        let data: [Term]?
+        let errDesc: String
+    }
+
+    private struct LessonCalendarRequest: Codable {
+        let termId: String
+        let studentId: String
+    }
+
+    private struct LessonTaskLookupRequest: Codable {
+        let studentId: String
+        let termId: String
+    }
+
+    struct Session: Codable {
+        let lastTime: String?
+        let photoUrl: String?
+        let tableCode: String
+        let lastIp: String?
+        let userType: String
+        let scopes: [String]
+        let loginCount: String
+        let schoolCode: String
+        let userId: String
+        let userCode: String
+        let userName: String
+        let userNameCn: String
+        let loginName: String
+        let language: String
+        let userRole: String
+        let loginPage: Int
+        let loginTime: String
+        let moduleId: String
+        let pagePermission: String
+
+        enum CodingKeys: String, CodingKey {
+            case lastTime
+            case photoUrl
+            case tableCode = "tableCode_"
+            case lastIp
+            case userType
+            case scopes
+            case loginCount
+            case schoolCode
+            case userId
+            case userCode
+            case userName
+            case userNameCn
+            case loginName
+            case language
+            case userRole
+            case loginPage
+            case loginTime
+            case moduleId
+            case pagePermission
+        }
+    }
+
+    struct Version: Codable {
+        let i18n: Int64
+        let dd: Int64
+        let parameter: Int64
+    }
+
+    struct Term: Codable {
+        let beginDate: String
+        let endDate: String
+        let termId: String
+    }
+
+    private struct LessonClassInfo: Codable {
+        let classInfoCode: String
+        let classInfoId: String
+        let classInfoName: String
+        let lessonClassId: String
+        let lessonTaskId: String
+    }
+
+    private struct StudentLessonTaskResponse: Codable {
+        let success: Bool
+        let data: [StudentLessonTask]?
+        let errDesc: String
+    }
+
+    private struct StudentLessonTask: Codable {
+        let bsid: String
+        let lessonClassCode: String
+    }
+
+    private struct LessonCalendar: Codable {
+        let courseId: String
+        let courseCode: String
+        let courseName: String
+        let courseNameEn: String?
+        let curriculumId: String
+        let dayOfWeek: Int
+        let facultyName: String
+        let newFacultyName: String
+        let lessonClassCode: String
+        let lessonClassName: String
+        let lessonTaskId: String
+        let classRoomName: String
+        let shiftClassRoomName: String
+        let memo: String
+        let sections: String
+        let joinSections: Int?
+        let week: String
+        let classInfos: [LessonClassInfo]
+    }
+
+    private func prepareCookies() {
+        cookies.forEach { cookie in
+            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+        }
+    }
+
+    private func serializedUserInfoRequest() throws -> String {
+        let request = UserInfoRequest(
+            version: Version(
+                i18n: 251211185520737,
+                dd: 251211185522967,
+                parameter: 260303145213804
+            )
+        )
+
+        let data = try JSONEncoder().encode(request)
+        guard let jsonString = String(data: data, encoding: .utf8) else {
+            throw APIError.internalError
+        }
+
+        return jsonString
+    }
+
+    private func serializedLessonCalendarRequest(termId: String, studentId: String) throws -> String {
+        let request = LessonCalendarRequest(termId: termId, studentId: studentId)
+        let data = try JSONEncoder().encode(request)
+        guard let jsonString = String(data: data, encoding: .utf8) else {
+            throw APIError.internalError
+        }
+
+        return jsonString
+    }
+
+    private func serializedLessonTaskLookupRequest(termId: String, studentId: String) throws -> String {
+        let request = LessonTaskLookupRequest(studentId: studentId, termId: termId)
+        let data = try JSONEncoder().encode(request)
+        guard let jsonString = String(data: data, encoding: .utf8) else {
+            throw APIError.internalError
+        }
+
+        return jsonString
+    }
+
+    private func getToken(scopes: [String]) async throws -> AccessToken {
+        guard let token = tokens.first(where: { candidate in
+            scopes.allSatisfy { scope in
+                candidate.scopes.contains(scope)
+            }
+        }) else {
+            throw WebAuthError.tokenWithScopeNotFound
+        }
+
+        if token.accessToken.isExpired {
+            return try await token.accessToken.refresh()
+        }
+
+        return token.accessToken
+    }
+
+    private func getLessonTasks(termId: String, studentId: String) async throws -> [StudentLessonTask] {
+        prepareCookies()
+
+        let response = try await AF.request(
+            Self.lessonTasksURL,
+            parameters: [
+                "_t": Int64(Date.now.timeIntervalSince1970 * 1000),
+                "jsonString": try serializedLessonTaskLookupRequest(termId: termId, studentId: studentId)
+            ],
+            encoding: URLEncoding(destination: .queryString)
+        )
+        .validate(statusCode: 200...200)
+        .serializingDecodable(StudentLessonTaskResponse.self)
+        .value
+
+        if !response.success {
+            throw APIError.remoteError(response.errDesc.isEmpty ? "服务器未返回课程任务信息" : response.errDesc)
+        }
+
+        return response.data ?? []
+    }
+
+    private func getLessonDetail(bsid: String, accessToken: String) async throws -> SJTUOpenAPI.ClassSchedule? {
+        let response = try await AF.request(
+            "https://api.sjtu.edu.cn/v1/lesson/\(bsid)",
+            parameters: [
+                "access_token": accessToken
+            ],
+            encoding: URLEncoding(destination: .queryString)
+        )
+        .validate(statusCode: 200...200)
+        .serializingDecodable(OpenApiResponse<SJTUOpenAPI.ClassSchedule>.self)
+        .value
+
+        if response.errno != 0 {
+            throw APIError.remoteError(response.error)
+        }
+
+        return response.entities?.first
+    }
+
+    func getUserInfo() async throws -> UserInfoResponse {
+        prepareCookies()
+
+        return try await AF.request(
+            Self.userInfoURL,
+            parameters: [
+                "jsonString": try serializedUserInfoRequest()
+            ],
+            encoding: URLEncoding(destination: .queryString),
+        )
+        .validate(statusCode: 200...200)
+        .serializingDecodable(UserInfoResponse.self)
+        .value
+    }
+
+    func getTerms() async throws -> [Term] {
+        prepareCookies()
+
+        let response = try await AF.request(
+            Self.termsURL,
+            parameters: [
+                "_t": Int64.random(in: 0...Int64.max),
+                "start": 0,
+                "limie": 999999
+            ],
+            encoding: URLEncoding(destination: .queryString),
+        )
+        .validate(statusCode: 200...200)
+        .serializingDecodable(TermResponse.self)
+        .value
+
+        if !response.success {
+            throw APIError.remoteError(response.errDesc.isEmpty ? "服务器未返回学期信息" : response.errDesc)
+        }
+
+        guard let terms = response.data, !terms.isEmpty else {
+            throw APIError.remoteError("服务器未返回学期信息")
+        }
+
+        return terms
+    }
+
+    func getCurrentTermId(for date: Date) async throws -> String {
+        let selectedDay = date.startOfDay()
+
+        for term in try await getTerms() {
+            guard let beginDate = Date.fromFormat("yyyy-MM-dd", dateStr: term.beginDate),
+                  let endDate = Date.fromFormat("yyyy-MM-dd", dateStr: term.endDate) else {
+                throw APIError.internalError
+            }
+
+            if beginDate.startOfDay() <= selectedDay && selectedDay <= endDate.startOfDay() {
+                return term.termId
+            }
+        }
+
+        throw APIError.runtimeError("当前日期不属于任何有效学期")
+    }
+
+    func getSchedules(jointSemester: Semester, sjtuSemester: Semester?, termId: String, studentId: String) async throws -> [CourseClassSchedule] {
+        prepareCookies()
+
+        let response = try await AF.request(
+            Self.schedulesURL,
+            method: .post,
+            parameters: [
+                "jsonString": try serializedLessonCalendarRequest(termId: termId, studentId: studentId)
+            ],
+            encoding: URLEncoding.httpBody
+        )
+        .validate(statusCode: 200...200)
+        .serializingDecodable([LessonCalendar].self)
+        .value
+
+        if response.isEmpty {
+            return []
+        }
+
+        let lessonTasks = try await getLessonTasks(termId: termId, studentId: studentId)
+        let bsidByLessonClassCode = Dictionary(
+            lessonTasks.compactMap { task -> (String, String)? in
+                let lessonClassCode = task.lessonClassCode.trimSpace()
+                let bsid = task.bsid.trimSpace()
+                guard !lessonClassCode.isEmpty, !bsid.isEmpty else {
+                    return nil
+                }
+                return (lessonClassCode, bsid)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        let accessToken = try await getToken(scopes: ["lessons"]).access_token
+        let distinctBsids = Array(Set(bsidByLessonClassCode.values))
+        var detailsByBsid: [String: SJTUOpenAPI.ClassSchedule] = [:]
+
+        try await withThrowingTaskGroup(of: (String, SJTUOpenAPI.ClassSchedule?).self) { group in
+            for bsid in distinctBsids {
+                group.addTask {
+                    (bsid, try await getLessonDetail(bsid: bsid, accessToken: accessToken))
+                }
+            }
+
+            for try await (bsid, detail) in group {
+                if let detail {
+                    detailsByBsid[bsid] = detail
+                }
+            }
+        }
+
+        struct LessonSegment {
+            let courseIdentity: String
+            let teacherIdentity: String
+            let day: Int
+            let week: Int
+            let startPeriod: Int
+            var length: Int
+            let classroom: String
+        }
+
+        func resolvedClassId(for lesson: LessonCalendar) throws -> String {
+            if let lessonClassId = lesson.classInfos.first?.lessonClassId.trimSpace(), !lessonClassId.isEmpty {
+                return lessonClassId
+            }
+
+            let classCode = lesson.lessonClassCode.trimSpace()
+            if !classCode.isEmpty {
+                return classCode
+            }
+
+            let lessonTaskId = lesson.lessonTaskId.trimSpace()
+            if !lessonTaskId.isEmpty {
+                return lessonTaskId
+            }
+
+            throw APIError.internalError
+        }
+
+        func resolvedCourseName(for lesson: LessonCalendar) -> String {
+            let courseName = lesson.courseName.trimSpace()
+            if !courseName.isEmpty {
+                return courseName
+            }
+
+            if let courseNameEn = lesson.courseNameEn?.trimSpace(), !courseNameEn.isEmpty {
+                return courseNameEn
+            }
+
+            let className = lesson.lessonClassName.trimSpace()
+            if !className.isEmpty {
+                return className
+            }
+
+            return lesson.courseCode.trimSpace()
+        }
+
+        func rawClassroom(for lesson: LessonCalendar) -> String {
+            let shiftedClassroom = lesson.shiftClassRoomName.trimSpace()
+            if !shiftedClassroom.isEmpty {
+                return shiftedClassroom
+            }
+
+            let classroom = lesson.classRoomName.trimSpace()
+            if !classroom.isEmpty {
+                return classroom
+            }
+
+            return "未排教室"
+        }
+
+        func rawTeachers(for lesson: LessonCalendar) -> [String] {
+            let candidates = [
+                lesson.facultyName.trimSpace(),
+                lesson.newFacultyName.trimSpace()
+            ].filter { !$0.isEmpty }
+
+            return Array(Set(candidates)).sorted()
+        }
+
+        func resolvedCourseIdentity(for lesson: LessonCalendar) -> String {
+            let courseId = lesson.courseId.trimSpace()
+            if !courseId.isEmpty {
+                return courseId
+            }
+
+            let curriculumId = lesson.curriculumId.trimSpace()
+            if !curriculumId.isEmpty {
+                return curriculumId
+            }
+
+            let courseCode = lesson.courseCode.trimSpace()
+            if !courseCode.isEmpty {
+                return courseCode
+            }
+
+            return lesson.lessonTaskId.trimSpace()
+        }
+
+        func resolvedOrganization(for lesson: LessonCalendar, detail: SJTUOpenAPI.ClassSchedule?) -> Organization? {
+            if let id = detail?.organize.id?.trimSpace(), !id.isEmpty,
+               let name = detail?.organize.name?.trimSpace(), !name.isEmpty {
+                return Organization(id: id, college: .joint, name: name)
+            }
+
+            guard let classInfo = lesson.classInfos.first else {
+                return nil
+            }
+
+            let classInfoId = classInfo.classInfoId.trimSpace()
+            let classInfoName = classInfo.classInfoName.trimSpace()
+            guard !classInfoId.isEmpty, !classInfoName.isEmpty else {
+                return nil
+            }
+
+            return Organization(id: classInfoId, college: .joint, name: classInfoName)
+        }
+
+        func resolvedDay(for lesson: LessonCalendar) throws -> Int {
+            guard (1...7).contains(lesson.dayOfWeek) else {
+                throw APIError.internalError
+            }
+
+            return lesson.dayOfWeek - 1
+        }
+
+        func resolvedPeriod(for lesson: LessonCalendar) throws -> Int {
+            guard let section = Int(lesson.sections.trimSpace()) else {
+                throw APIError.internalError
+            }
+
+            let period = section - 1
+            guard CollegeTimeTable[.joint]?.contains(where: { $0.id == period }) == true else {
+                throw APIError.internalError
+            }
+
+            return period
+        }
+
+        func resolvedLength(for lesson: LessonCalendar) -> Int {
+            max(lesson.joinSections ?? 1, 1)
+        }
+
+        func resolvedWeeks(for lesson: LessonCalendar) throws -> [Int] {
+            let weeks = Array(Set(lesson.week.split(separator: ",").compactMap { weekText in
+                Int(weekText.trimmingCharacters(in: .whitespacesAndNewlines))
+            })).sorted()
+
+            guard !weeks.isEmpty else {
+                throw APIError.internalError
+            }
+
+            return weeks.map { $0 - 1 }
+        }
+
+        func resolvedDetail(for lesson: LessonCalendar) -> SJTUOpenAPI.ClassSchedule? {
+            let lessonClassCode = lesson.lessonClassCode.trimSpace()
+            guard let bsid = bsidByLessonClassCode[lessonClassCode] else {
+                return nil
+            }
+
+            return detailsByBsid[bsid]
+        }
+
+        func convertedSJTUWeek(from jointWeek: Int) -> Int? {
+            guard let sjtuSemester else {
+                return nil
+            }
+
+            let lessonDate = jointSemester.start_at.addWeeks(jointWeek)
+            return lessonDate.weeksSince(sjtuSemester.start_at)
+        }
+
+        func resolvedTeachers(for lesson: LessonCalendar, detail: SJTUOpenAPI.ClassSchedule?) -> [String] {
+            let detailTeachers = detail?.teachers.map { $0.name.trimSpace() }.filter { !$0.isEmpty } ?? []
+            if !detailTeachers.isEmpty {
+                return Array(Set(detailTeachers)).sorted()
+            }
+
+            return rawTeachers(for: lesson)
+        }
+
+        func resolvedClassroom(for lesson: LessonCalendar, detail: SJTUOpenAPI.ClassSchedule?, jointWeek: Int, day: Int, period: Int) -> String {
+            if let sjtuWeek = convertedSJTUWeek(from: jointWeek),
+               let classroom = detail?.classes.first(where: { classInfo in
+                classInfo.schedule.week == sjtuWeek &&
+                classInfo.schedule.day == day &&
+                classInfo.schedule.period == period
+            })?.classroom.name.trimSpace(),
+            !classroom.isEmpty {
+                return classroom
+            }
+
+            return rawClassroom(for: lesson)
+        }
+
+        func mergedSegments(for lessons: [LessonCalendar]) throws -> [LessonSegment] {
+            let segments = try lessons.flatMap { lesson -> [LessonSegment] in
+                let detail = resolvedDetail(for: lesson)
+                let day = try resolvedDay(for: lesson)
+                let startPeriod = try resolvedPeriod(for: lesson)
+                let baseLength = resolvedLength(for: lesson)
+                let teachers = resolvedTeachers(for: lesson, detail: detail)
+                let teacherIdentity = teachers.joined(separator: "|")
+                let courseIdentity = resolvedCourseIdentity(for: lesson)
+
+                return try resolvedWeeks(for: lesson).map { week in
+                    LessonSegment(
+                        courseIdentity: courseIdentity,
+                        teacherIdentity: teacherIdentity,
+                        day: day,
+                        week: week,
+                        startPeriod: startPeriod,
+                        length: baseLength,
+                        classroom: resolvedClassroom(
+                            for: lesson,
+                            detail: detail,
+                            jointWeek: week,
+                            day: day,
+                            period: startPeriod
+                        )
+                    )
+                }
+            }.sorted {
+                if $0.week != $1.week {
+                    return $0.week < $1.week
+                }
+
+                if $0.day != $1.day {
+                    return $0.day < $1.day
+                }
+
+                if $0.courseIdentity != $1.courseIdentity {
+                    return $0.courseIdentity < $1.courseIdentity
+                }
+
+                if $0.teacherIdentity != $1.teacherIdentity {
+                    return $0.teacherIdentity < $1.teacherIdentity
+                }
+
+                if $0.classroom != $1.classroom {
+                    return $0.classroom < $1.classroom
+                }
+
+                return $0.startPeriod < $1.startPeriod
+            }
+
+            var merged: [LessonSegment] = []
+
+            for segment in segments {
+                if var last = merged.last,
+                   last.courseIdentity == segment.courseIdentity,
+                   last.teacherIdentity == segment.teacherIdentity,
+                   last.day == segment.day,
+                   last.week == segment.week,
+                   last.classroom == segment.classroom,
+                   segment.startPeriod <= last.startPeriod + last.length {
+                    let mergedEnd = max(last.startPeriod + last.length, segment.startPeriod + segment.length)
+                    last.length = mergedEnd - last.startPeriod
+                    merged[merged.count - 1] = last
+                } else {
+                    merged.append(segment)
+                }
+            }
+
+            return merged
+        }
+
+        let groupedLessons = try Dictionary(grouping: response, by: { lesson in
+            try resolvedClassId(for: lesson)
+        })
+        let palette = ClassColors.shuffled()
+
+        return try groupedLessons.values.enumerated().map { index, lessons in
+            guard let first = lessons.first else {
+                throw APIError.internalError
+            }
+
+            let detail = resolvedDetail(for: first)
+            let classId = try resolvedClassId(for: first)
+            let organization = resolvedOrganization(for: first, detail: detail)
+            let courseCode = first.courseCode.trimSpace()
+            let classCode = first.lessonClassCode.trimSpace()
+            let className = first.lessonClassName.trimSpace()
+            let resolvedCourseCode = !courseCode.isEmpty ? courseCode : (classCode.isEmpty ? classId : classCode)
+            let teachers = Array(Set(lessons.flatMap { lesson in
+                resolvedTeachers(for: lesson, detail: resolvedDetail(for: lesson))
+            })).sorted()
+
+            var remarks: [String] = []
+            for lesson in lessons {
+                let memo = lesson.memo.trimSpace()
+                if !memo.isEmpty && !remarks.contains(memo) {
+                    remarks.append(memo)
+                }
+            }
+
+            var seenScheduleKeys: Set<String> = []
+            var schedules: [Schedule] = []
+
+            for segment in try mergedSegments(for: lessons) {
+                for offset in 0..<segment.length {
+                    let period = segment.startPeriod + offset
+                    guard CollegeTimeTable[.joint]?.contains(where: { $0.id == period }) == true else {
+                        throw APIError.internalError
+                    }
+
+                    let key = "\(segment.week)-\(segment.day)-\(period)-\(segment.classroom)"
+                    if !seenScheduleKeys.insert(key).inserted {
+                        continue
+                    }
+
+                    schedules.append(
+                        Schedule(
+                            class_id: classId,
+                            college: .joint,
+                            classroom: segment.classroom,
+                            day: segment.day,
+                            period: period,
+                            week: segment.week,
+                            is_start: offset == 0,
+                            length: offset == 0 ? segment.length : 0
+                        )
+                    )
+                }
+            }
+
+            return CourseClassSchedule(
+                course: Course(
+                    code: resolvedCourseCode,
+                    college: .joint,
+                    name: resolvedCourseName(for: first)
+                ),
+                class_: Class(
+                    id: classId,
+                    college: .joint,
+                    color: palette[index % palette.count],
+                    course_code: resolvedCourseCode,
+                    organization_id: organization?.id,
+                    name: className.isEmpty ? resolvedCourseName(for: first) : className,
+                    code: classCode.isEmpty ? classId : classCode,
+                    teachers: teachers,
+                    hours: detail?.hours ?? -1,
+                    credits: detail?.credits ?? -1,
+                    semester_id: jointSemester.id
+                ),
+                schedules: schedules.sorted {
+                    if $0.week != $1.week {
+                        return $0.week < $1.week
+                    }
+
+                    if $0.day != $1.day {
+                        return $0.day < $1.day
+                    }
+
+                    return $0.period < $1.period
+                },
+                organization: organization,
+                remarks: remarks.isEmpty ? nil : [
+                    ClassRemark(
+                        class_id: classId,
+                        college: .joint,
+                        remark: remarks.joined(separator: "\n")
+                    )
+                ]
             )
         }
     }
@@ -759,6 +1574,159 @@ struct SJTUOpenAPI {
                     return Schedule(class_id: entity.bsid, college: .sjtu, classroom: schedule.classroom.name, day: schedule.schedule.day, period: schedule.schedule.period, week: schedule.schedule.week, is_start: isStart, length: length)
                 },
                 organization: entity.organize.id != nil ? Organization(id: entity.organize.id!, college: .sjtu, name: entity.organize.name!) : nil
+            )
+        }
+    }
+}
+
+struct ElectSysAPI {
+    var cookies: [HTTPCookie]
+    
+    struct Exam {
+        let courseName: String
+        let courseCode: String
+        var start: Date?
+        var end: Date?
+        let location: String
+        let campus: String
+        let isRebuild: Bool
+        let examName: String
+        let type: String?
+        let order: Int
+        let gradeType: String?
+        let code: String
+        let classCode: String
+    }
+    
+    struct Grade {
+        let id: String
+        let courseName: String
+        let courseCode: String
+        let credit: String
+        let score: String
+        let grade: String?
+        let remark: String?
+        let teacher: String
+    }
+    
+    private struct ElectSysResponse<T: Codable>: Codable {
+        let currentPage, currentResult: Int
+        let items: [T]
+        let totalCount, totalPage, totalResult: Int
+    }
+
+    struct ElectSysExam: Codable {
+        let ksfs: String?
+        let ksmc, kssj: String
+        let cdmc: String
+        let cxbj, khfs: String?
+        let cdxqmc, kcmc: String
+        let kch, jxbmc, sjbh: String
+        let rowID: Int
+
+        enum CodingKeys: String, CodingKey {
+            case ksfs, ksmc, kssj, kch, cxbj, khfs, cdmc, cdxqmc, kcmc, jxbmc, sjbh
+            case rowID = "row_id"
+        }
+    }
+    
+    struct ElectSysGrade: Codable {
+        let bfzcj: String
+        let cj: String
+        let jd: String?
+        let jxbmc: String?
+        let key: String
+        let kch, kcmc: String
+        let kcxzmc: String?
+        let khfsmc: String?
+        let kklxdm: String?
+        let jsxm: String
+        let ksxz: String
+        let rowID: String
+        let xf: String
+        let cjbz, sskcmc: String?
+
+        enum CodingKeys: String, CodingKey {
+            case bfzcj, cj, jd, jxbmc, kch, kcmc, kcxzmc, khfsmc, kklxdm, ksxz, cjbz, sskcmc, xf, jsxm, key
+            case rowID = "row_id"
+        }
+    }
+    
+    func openIdConnect() async throws {
+        cookies.forEach { cookie in
+            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+        }
+        
+        let response = try await AF.request("https://i.sjtu.edu.cn/jaccountlogin")
+            .serializingString()
+            .value
+        if response.contains("无法登录") {
+            throw APIError.noAccount
+        }
+    }
+    
+    func getExams(year: Int, semester: Int) async throws -> [Exam] {
+        let response = try await AF.request(
+            "https://i.sjtu.edu.cn/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105",
+            method: .post,
+            parameters: [
+                "xnm": year,
+                "xqm": [3, 12, 16][semester - 1],
+                "queryModel.showCount": 100,
+                "queryModel.sortOrder": "asc"
+            ],
+            encoding: URLEncoding.httpBody
+        ).serializingDecodable(ElectSysResponse<ElectSysExam>.self).value
+
+        let date = /([0-9]+)-([0-9]+)-([0-9]+)\(([0-9]+):([0-9]+)-([0-9]+):([0-9]+)\)/
+        return response.items.map { exam in
+            var _exam = Exam(
+                courseName: exam.kcmc,
+                courseCode: exam.kch,
+                start: nil,
+                end: nil,
+                location: exam.cdmc,
+                campus: exam.cdxqmc,
+                isRebuild: exam.cxbj != "否",
+                examName: exam.ksmc,
+                type: exam.ksfs,
+                order: exam.rowID,
+                gradeType: exam.khfs,
+                code: exam.sjbh,
+                classCode: exam.jxbmc
+            )
+            
+            if let examDate = exam.kssj.firstMatch(of: date) {
+                _exam.start = Calendar.iso8601.date(from: .init(year: Int(examDate.1), month: Int(examDate.2), day: Int(examDate.3), hour: Int(examDate.4), minute: Int(examDate.5)))
+                _exam.end = Calendar.iso8601.date(from: .init(year: Int(examDate.1), month: Int(examDate.2), day: Int(examDate.3), hour: Int(examDate.6), minute: Int(examDate.7)))
+            }
+            return _exam
+        }
+    }
+    
+    func getGrades(year: Int, semester: Int) async throws -> [Grade] {        
+        let response = try await AF.request(
+            "https://i.sjtu.edu.cn/cjcx/cjcx_cxXsgrcj.html?doType=query&gnmkdm=N305005",
+            method: .post,
+            parameters: [
+                "xnm": year,
+                "xqm": [3, 12, 16][semester - 1],
+                "queryModel.showCount": 100,
+                "queryModel.sortOrder": "asc"
+            ],
+            encoding: URLEncoding.httpBody
+        ).serializingDecodable(ElectSysResponse<ElectSysGrade>.self).value
+        
+        return response.items.map { grade in
+            Grade(
+                id: grade.key,
+                courseName: grade.kcmc,
+                courseCode: grade.kch,
+                credit: grade.xf,
+                score: grade.cj,
+                grade: grade.jd,
+                remark: grade.cjbz,
+                teacher: grade.jsxm
             )
         }
     }

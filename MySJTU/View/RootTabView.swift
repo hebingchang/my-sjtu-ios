@@ -6,6 +6,116 @@
 //
 
 import SwiftUI
+import UIKit
+
+struct NativeTabBarController: UIViewControllerRepresentable {
+    private enum TabIndex: Int {
+        case home = 0
+        case unicode = 1
+        case profile = 2
+    }
+
+    @Binding var selectedIndex: Int
+    var displayMode: DisplayMode
+    var onActionTap: () -> Void
+
+    private var homeIconName: String {
+        displayMode == .day ? "calendar.day.timeline.left" : "calendar"
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeUIViewController(context: Context) -> UITabBarController {
+        let tab = UITabBarController()
+        tab.delegate = context.coordinator
+
+        tab.viewControllers = [
+            homeController(),
+            unicodeController(),
+            profileController(),
+        ]
+        tab.selectedIndex = selectedIndex
+
+        return tab
+    }
+
+    func updateUIViewController(_ uiViewController: UITabBarController, context: Context) {
+        if uiViewController.selectedIndex != selectedIndex {
+            uiViewController.selectedIndex = selectedIndex
+        }
+
+        if let viewControllers = uiViewController.viewControllers,
+           viewControllers.indices.contains(TabIndex.home.rawValue) {
+            let homeTabBarItem = viewControllers[TabIndex.home.rawValue].tabBarItem
+            if homeTabBarItem?.accessibilityIdentifier != homeIconName {
+                homeTabBarItem?.image = UIImage(systemName: homeIconName)
+                homeTabBarItem?.selectedImage = nil
+                homeTabBarItem?.accessibilityIdentifier = homeIconName
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, UITabBarControllerDelegate {
+        var parent: NativeTabBarController
+
+        init(parent: NativeTabBarController) {
+            self.parent = parent
+        }
+
+        func tabBarController(_ tabBarController: UITabBarController,
+                              shouldSelect viewController: UIViewController) -> Bool {
+            guard
+                let vcs = tabBarController.viewControllers,
+                let index = vcs.firstIndex(of: viewController)
+            else { return true }
+
+            if index == TabIndex.unicode.rawValue {
+                parent.onActionTap()
+                return false
+            }
+            return true
+        }
+
+        func tabBarController(_ tabBarController: UITabBarController,
+                              didSelect viewController: UIViewController) {
+            parent.selectedIndex = tabBarController.selectedIndex
+        }
+    }
+
+    private func homeController() -> UIViewController {
+        let home = UIHostingController(rootView: ScheduleView())
+        let homeTabBarItem = UITabBarItem(
+            title: "日程",
+            image: UIImage(systemName: homeIconName),
+            tag: TabIndex.home.rawValue
+        )
+        homeTabBarItem.accessibilityIdentifier = homeIconName
+        home.tabBarItem = homeTabBarItem
+        return home
+    }
+
+    private func unicodeController() -> UIViewController {
+        let unicode = UIViewController()
+        unicode.tabBarItem = UITabBarItem(
+            title: "思源码",
+            image: UIImage(systemName: "qrcode"),
+            tag: TabIndex.unicode.rawValue
+        )
+        return unicode
+    }
+
+    private func profileController() -> UIViewController {
+        let profile = UIHostingController(rootView: ProfileView())
+        profile.tabBarItem = UITabBarItem(
+            title: "我",
+            image: UIImage(systemName: "person.crop.circle.fill"),
+            tag: TabIndex.profile.rawValue
+        )
+        return profile
+    }
+}
 
 struct RootTabView: View {
     let today = Calendar.current.component(.day, from: Date())
@@ -16,8 +126,7 @@ struct RootTabView: View {
     
     @State private var isUnicodePresented = false
     @State private var isAccountViewPresent = false
-    @State private var selectedTab: Int = 1
-    @State private var previousTab: Int = 1
+    @State private var selectedIndex = 0
     
     @State private var showNoAccountAlert: Bool = false
     @State private var showNoPermission: Bool = false
@@ -54,50 +163,10 @@ struct RootTabView: View {
     }
     
     var body: some View {
-        //        ZStack(alignment: .bottom) {
-        TabView(selection: $selectedTab) {
-            Group {
-                ScheduleView()
-                    .tabItem {
-                        Image(systemName: displayMode == .day ? "calendar.day.timeline.left" : "calendar")
-                        Text("日程")
-                    }
-                    .tag(1)
-                
-                Color.clear
-                    .tabItem {
-                        Image(systemName: "qrcode")
-                        Text("思源码")
-                    }
-                    .tag(2)
-                    .onTapGesture {
-                        print("tap unicode")
-                    }
-                
-                ProfileView()
-                    .tabItem {
-                        Image(systemName: "person.crop.circle.fill")
-                        Text("我")
-                    }
-                    .tag(3)
-            }
-            .toolbarBackgroundVisibility(.visible, for: .tabBar)
-            // .toolbarBackground(.tab, for: .tabBar)
+        NativeTabBarController(selectedIndex: $selectedIndex, displayMode: displayMode) {
+            checkUnicode()
         }
-        .onChange(of: selectedTab) {
-            if selectedTab == 2 {
-                if previousTab == 1 {
-                    selectedTab = 1
-                } else if previousTab == 3 {
-                    DispatchQueue.main.asyncAfter(deadline: .now()) {
-                        selectedTab = 3
-                    }
-                }
-                checkUnicode()
-            } else {
-                previousTab = selectedTab
-            }
-        }
+        .ignoresSafeArea()
         .sheet(isPresented: $isUnicodePresented) {
             UnicodeView()
         }
@@ -154,54 +223,7 @@ struct RootTabView: View {
                 checkUnicode()
             }
         }
-        
-        //            HStack {
-        //                VStack(spacing: 4) {
-        //                    Image(systemName: displayMode == .day ? "calendar.day.timeline.left" : "calendar")
-        //                        .font(.system(size: 24))
-        //                    Text("日程")
-        //                        .font(.system(size: 9))
-        //                }
-        //                .foregroundColor(selectedTab == 1 ? Color(UIColor.tintColor) : .gray)
-        //                .frame(maxWidth: .infinity)
-        //                .contentShape(Rectangle())
-        //                .onTapGesture {
-        //                    selectedTab = 1
-        //                }
-        //
-        //                VStack(spacing: 4) {
-        //                    Image(systemName: "qrcode")
-        //                        .font(.system(size: 24))
-        //                    Text("思源码")
-        //                        .font(.system(size: 9))
-        //                }
-        //                .foregroundColor(.gray)
-        //                .frame(maxWidth: .infinity)
-        //                .contentShape(Rectangle())
-        //                .onTapGesture {
-        //                    checkUnicode()
-        //                }
-        //
-        //                VStack(spacing: 4) {
-        //                    Image(systemName: "person.crop.circle.fill")
-        //                        .font(.system(size: 24))
-        //                    Text("我")
-        //                        .font(.system(size: 9))
-        //                }
-        //                .foregroundColor(selectedTab == 3 ? Color(UIColor.tintColor) : .gray)
-        //                .frame(maxWidth: .infinity)
-        //                .contentShape(Rectangle())
-        //                .onTapGesture {
-        //                    if selectedTab == 3 {
-        //                    } else {
-        //                        selectedTab = 3
-        //                    }
-        //                }
-        //            }
-        //            .padding([.top], 7)
-        //            .ignoresSafeArea()
     }
-    //    }
 }
 
 #Preview {

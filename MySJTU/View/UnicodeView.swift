@@ -9,7 +9,6 @@ import SwiftUI
 import QRCode
 import Lottie
 import PhotosUI
-import SwiftyCrop
 
 struct DataUrl: Transferable {
     let url: URL
@@ -38,7 +37,7 @@ struct UnicodeView: View {
     @State private var user: WebAuthUser?
     @State private var originalBrightness: CGFloat?
     @State private var showPhotosPicker: Bool = false
-    @State private var selectedImage: UIImage?
+    @State private var croppedAvatarImage: UIImage?
     @State private var photoBackground: Color?
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject private var appConfig: AppConfig
@@ -70,6 +69,7 @@ struct UnicodeView: View {
                 for i in 0..<accounts.count {
                     if accounts[i].provider == .jaccount {
                         user = accounts[i].user
+                        // print(accounts[i].cookies)
 
                         for j in 0..<accounts[i].tokens.count {
                             if accounts[i].tokens[j].scopes.contains("unicode") {
@@ -277,59 +277,18 @@ struct UnicodeView: View {
                         break
                     }
                 }
-                .photosPicker(
-                    isPresented: $showPhotosPicker,
-                    selection: Binding(
-                        get: { nil },
-                        set: {
-                            if let photo = $0 {
-                                photo.loadTransferable(type: Data.self) { result in
-                                    switch result {
-                                    case .success(let image?):
-                                        selectedImage = UIImage(data: image)
-                                    case .success(.none):
-                                        break
-                                    case .failure(_):
-                                        break
-                                    }
-                                }
-                            }
+                .cropImagePicker(cropType: .circle, show: $showPhotosPicker, croppedImage: $croppedAvatarImage)
+                .onChange(of: croppedAvatarImage) { _, croppedImage in
+                    guard let croppedImage, let data = croppedImage.pngData() else { return }
+                    do {
+                        if let customAvatar {
+                            try deletePhoto(url: customAvatar)
                         }
-                    ),
-                    matching: .any(of: [.images, .screenshots])
-                )
-                .fullScreenCover(isPresented: Binding(
-                    get: { selectedImage != nil },
-                    set: { if $0 == false { selectedImage = nil } }
-                )) {
-                    NavigationView {
-                        SwiftyCropView(
-                            imageToCrop: selectedImage!,
-                            maskShape: .circle,
-                            configuration: SwiftyCropConfiguration(
-                                maskRadius: UIScreen.main.bounds.size.width,
-                                zoomSensitivity: 8.0,
-                                texts: SwiftyCropConfiguration.Texts(
-                                    cancelButton: "取消",
-                                    interactionInstructions: "移动并缩放",
-                                    saveButton: "完成"
-                                )
-                            )
-                        ) { croppedImage in
-                            DispatchQueue.main.async {
-                                if let image = croppedImage, let data = image.pngData() {
-                                    do {
-                                        if let customAvatar {
-                                            try deletePhoto(url: customAvatar)
-                                        }
-                                        customAvatar = try savePNGPhoto(data: data)
-                                    } catch {
-                                        print(error)
-                                    }
-                                }
-                            }
-                        }
+                        customAvatar = try savePNGPhoto(data: data)
+                    } catch {
+                        print(error)
                     }
+                    self.croppedAvatarImage = nil
                 }
             } else {
                 ProgressView()

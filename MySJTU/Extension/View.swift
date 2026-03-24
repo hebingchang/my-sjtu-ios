@@ -23,6 +23,15 @@ extension View {
     func border(width: CGFloat, edges: [Edge], color: Color) -> some View {
         overlay(EdgeBorder(width: width, edges: edges).foregroundColor(color))
     }
+    
+    @ViewBuilder
+    func adaptiveButtonStyle(isProminent: Bool) -> some View {
+        if isProminent {
+            self.buttonStyle(.glassProminent)
+        } else {
+            self.buttonStyle(.glass)
+        }
+    }
 }
 
 private struct FirstAppear: ViewModifier {

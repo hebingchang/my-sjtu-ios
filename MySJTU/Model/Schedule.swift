@@ -20,6 +20,81 @@ struct Semester: Codable, FetchableRecord, PersistableRecord, Equatable {
     var semester: Int
     var start_at: Date
     var end_at: Date
+    var name: String?
+}
+
+extension Semester {
+    private func lastIncludedMoment(using calendar: Calendar = .iso8601) -> Date {
+        max(start_at, end_at.addSeconds(-1, using: calendar))
+    }
+
+    func contains(_ date: Date) -> Bool {
+        start_at <= date && date < end_at
+    }
+
+    func overlapsWeek(containing date: Date, using calendar: Calendar = .iso8601) -> Bool {
+        let weekStart = date.startOfWeek(using: calendar)
+        let weekEnd = weekStart.addWeeks(1, using: calendar)
+        return start_at < weekEnd && end_at > weekStart
+    }
+
+    func displayWeekReferenceDate(for date: Date, isWeekContext: Bool, using calendar: Calendar = .iso8601) -> Date? {
+        if contains(date) {
+            return date
+        }
+
+        guard isWeekContext, overlapsWeek(containing: date, using: calendar) else {
+            return nil
+        }
+
+        if date < start_at {
+            return start_at
+        }
+
+        return lastIncludedMoment(using: calendar)
+    }
+
+    func displayWeekIndex(for date: Date, isWeekContext: Bool = false, using calendar: Calendar = .iso8601) -> Int? {
+        guard let referenceDate = displayWeekReferenceDate(for: date, isWeekContext: isWeekContext, using: calendar) else {
+            return nil
+        }
+
+        return referenceDate.weeksSince(start_at, using: calendar)
+    }
+
+    func displayWeekCount(using calendar: Calendar = .iso8601) -> Int {
+        max(1, lastIncludedMoment(using: calendar).weeksSince(start_at, using: calendar) + 1)
+    }
+
+    func displayDayRangeInWeek(containing date: Date, using calendar: Calendar = .iso8601) -> ClosedRange<Int>? {
+        let weekStart = date.startOfWeek(using: calendar)
+        let weekEnd = weekStart.addWeeks(1, using: calendar)
+        let overlapStart = max(start_at.startOfDay(using: calendar), weekStart)
+        let overlapEnd = min(end_at, weekEnd)
+
+        guard overlapStart < overlapEnd else {
+            return nil
+        }
+
+        let overlapLastDay = overlapEnd.addSeconds(-1, using: calendar).startOfDay(using: calendar)
+        let startDay = overlapStart.daysSince(weekStart, using: calendar)
+        let endDay = overlapLastDay.daysSince(weekStart, using: calendar)
+        return startDay...endDay
+    }
+
+    func distanceToDisplayWeekReference(for date: Date, isWeekContext: Bool, using calendar: Calendar = .iso8601) -> TimeInterval {
+        guard let referenceDate = displayWeekReferenceDate(for: date, isWeekContext: isWeekContext, using: calendar) else {
+            return .greatestFiniteMagnitude
+        }
+
+        return abs(referenceDate.timeIntervalSince(date))
+    }
+
+    func dateForDisplayWeek(_ week: Int, matchingWeekdayOf date: Date, using calendar: Calendar = .iso8601) -> Date {
+        let weekStart = start_at.startOfWeek(using: calendar).addWeeks(week - 1, using: calendar)
+        let weekdayOffset = date.daysSince(date.startOfWeek(using: calendar), using: calendar)
+        return weekStart.addDays(weekdayOffset, using: calendar)
+    }
 }
 
 struct Organization: Codable, FetchableRecord, PersistableRecord {
@@ -206,7 +281,7 @@ struct Schedule: Codable, FetchableRecord, PersistableRecord {
     var college: College
     var classroom: String
     var day: Int
-    var period: Int
+    var period: Int // period_id
     var week: Int
     var is_start: Bool
     var length: Int
@@ -245,6 +320,12 @@ extension Schedule {
     func finish() -> Period {
         CollegeTimeTable[college]!.first { p in
             p.id == period + length - 1
+        }!
+    }
+    
+    func periodIndex() -> Int {
+        CollegeTimeTable[college]!.firstIndex { p in
+            p.id == period
         }!
     }
 

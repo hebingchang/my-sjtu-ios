@@ -12,6 +12,7 @@ extension College {
         switch self {
         case .sjtu: return .jaccount
         case .sjtug: return .jaccount
+        case .joint: return .jaccount
         case .shsmu: return .shsmu
         }
     }
@@ -19,15 +20,17 @@ extension College {
 
 enum Feature: Codable {
     case schedule
+    case examAndGrade
     case unicode
-    case campus_card
+    case campusCard
     case canvas
 
     var name: String {
         switch self {
         case .schedule: return "课程信息"
+        case .examAndGrade: return "考试与成绩"
         case .unicode: return "思源码"
-        case .campus_card: return "校园卡"
+        case .campusCard: return "校园卡"
         case .canvas: return "在线教学平台 (Canvas)"
         }
     }

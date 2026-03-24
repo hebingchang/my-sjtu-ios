@@ -79,7 +79,7 @@ extension AccessToken {
         ).serializingDecodable(ServerlessResponse<AccessToken>.self).value
         var token = response.data
         token.client_id = self.client_id
-
+        
         return token
     }
 
@@ -105,8 +105,9 @@ struct JAccountAuthProvider: WebAuthProvider {
 
     var features: [FeatureRequirement] = [
         FeatureRequirement(feature: .schedule, required: true),
+        FeatureRequirement(feature: .examAndGrade, required: false),
         FeatureRequirement(feature: .unicode, required: false),
-        FeatureRequirement(feature: .campus_card, required: false),
+        FeatureRequirement(feature: .campusCard, required: false),
         FeatureRequirement(feature: .canvas, required: false)
     ]
 

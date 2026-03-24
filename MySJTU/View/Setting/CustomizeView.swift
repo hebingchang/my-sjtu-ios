@@ -8,13 +8,44 @@
 import SwiftUI
 
 struct CustomizeView: View {
+    @AppStorage("settings.always_show_unicode_in_tabbar") var alwaysShowUnicode: Bool = true
+    @AppStorage("settings.schedule.auto_hide_week_label_overlay") var autoHideWeekLabelOverlay: Bool = true
+
     var body: some View {
         List {
-            Section(header: Text("背景")) {
+            Section(header: Text("日程")) {
                 NavigationLink {
-                    ScheduleHeaderBackground()
+                    ScheduleBackgroundImageView()
                 } label: {
-                    Label("日程页导航栏背景", systemImage: "list.dash.header.rectangle")
+                    Label("日程页背景图片", systemImage: "photo.on.rectangle.angled")
+                }
+
+                HStack {
+                    Text("滑动时自动隐藏学期标签")
+                    Spacer()
+                    Toggle(isOn: Binding(
+                        get: {
+                            autoHideWeekLabelOverlay
+                        },
+                        set: { newValue in
+                            autoHideWeekLabelOverlay = newValue
+                        }
+                    )) {}
+                }
+            }
+
+            Section(header: Text("标签栏")) {
+                HStack {
+                    Text("始终显示思源码标签")
+                    Spacer()
+                    Toggle(isOn: Binding(
+                        get: {
+                            alwaysShowUnicode
+                        },
+                        set: { newValue in
+                            alwaysShowUnicode = newValue
+                        }
+                    )) {}
                 }
             }
         }

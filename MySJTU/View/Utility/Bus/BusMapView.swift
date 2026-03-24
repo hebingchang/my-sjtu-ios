@@ -9,14 +9,14 @@ import SwiftUI
 import MapKit
 import Alamofire
 
-private struct BusResponse<T: Decodable>: Decodable {
+struct BusResponse<T: Decodable>: Decodable {
     let success: Bool
     let message: String
     let data: [T]
     let code: Int
 }
 
-private struct BusLine: Decodable, Equatable {
+struct BusLine: Decodable, Equatable {
     let id, lineSystemID: Int
     let lineCode, name: String
     let direction: Int
@@ -214,8 +214,7 @@ class MonitorSocket: ObservableObject {
 
 struct BusMapSheet: View {
     fileprivate let stations: [BusStation]
-    fileprivate let lines: [BusLine]
-    @Binding fileprivate var selectedLine: BusLine?
+    fileprivate var selectedLine: BusLine?
     @Binding fileprivate var selection: Int?
     @Environment(\.colorScheme) var colorScheme: ColorScheme
     
@@ -328,58 +327,8 @@ struct BusMapSheet: View {
             }
             
             ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    Section(
-                        header: VStack(alignment: .leading) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                let startStation = self.stations.first?.station.name ?? ""
-                                let endStation = self.stations.last?.station.name ?? ""
-                                
-                                Text(selectedLine.name)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                
-                                Menu {
-                                    ForEach(lines, id: \.id) { line in
-                                        Button {
-                                            self.selectedLine = line
-                                        } label: {
-                                            HStack {
-                                                if startStation == endStation {
-                                                    Text(line.direction == 0 ? "顺时针" : "逆时针")
-                                                } else {
-                                                    Text("开往 \(endStation)")
-                                                }
-                                                
-                                                if selectedLine.id == line.id {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    HStack {
-                                        if startStation == endStation {
-                                            Text(selectedLine.direction == 0 ? "顺时针" : "逆时针")
-                                                .font(.callout)
-                                        } else {
-                                            Text("开往 \(endStation)")
-                                                .font(.callout)
-                                        }
-                                        Image(systemName: "chevron.up.chevron.down")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 12, height: 12)
-                                    }
-                                    .foregroundStyle(Color(UIColor.secondaryLabel))
-                                }
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                            .frame(maxWidth: .infinity)
-                            .background(.ultraThickMaterial)
-                    ) {
+                VStack(spacing: 0) {
+                    if selectedLine.lineCode == "918484" {
                         ScrollView(.horizontal) {
                             HStack {
                                 Button("菁菁堂广场") {
@@ -421,58 +370,35 @@ struct BusMapSheet: View {
                         .scrollPosition($terminalScrollPosition)
                         .padding([.bottom])
                         .contentMargins([.leading, .trailing], 14, for: .scrollContent)
-                        
-                        if selection != nil {
-                            VStack(alignment: .leading, spacing: 0) {
-                                HStack {
-                                    Text("临近出发班次")
-                                        .font(.title3)
-                                        .fontWeight(.semibold)
-                                    Spacer()
-                                }
-                                .padding([.leading, .trailing])
-                                
-                                if stationSchedules != nil, comingSchedules.count > 0 {
-                                    ScrollView(.horizontal) {
-                                        HStack(spacing: 8) {
-                                            ForEach(Array(zip(comingSchedules.indices, comingSchedules)), id: \.1.time) { index, schedule in
-                                                VStack {
-                                                    Button {
-                                                        activeSchedule = schedule
-                                                        scheduleScrollPosition.scrollTo(id: schedule.time)
-                                                    } label: {
-                                                        VStack(spacing: 0) {
-                                                            let time = formatter.date(from: schedule.time)!
-
-                                                            if index == 0, let arrivingBus, abs(Date.now.addSeconds(arrivingBus.time).secondsFromTime(time)) <= 300 {
-                                                                let arrivingTime = Date.now.addSeconds(arrivingBus.time)
-                                                                let diff = arrivingTime.secondsFromTime(time)
-                                                                
-                                                                HStack(spacing: 2) {
-                                                                    Text(schedule.time)
-                                                                        .fontWeight(
-                                                                            schedule.time == activeSchedule?.time ?
-                                                                                .semibold : .medium
-                                                                        )
-                                                                        .foregroundStyle(
-                                                                            schedule.time == activeSchedule?.time ? Color(UIColor.label) : Color(UIColor.secondaryLabel)
-                                                                        )
-
-                                                                    Image(systemName: "dot.radiowaves.up.forward")
-                                                                        .resizable()
-                                                                        .scaledToFit()
-                                                                        .frame(width: 12, height: 12)
-                                                                        .foregroundStyle(
-                                                                            schedule.time == activeSchedule?.time ? (diff <= 0 ? Color.green : Color.red) : Color(UIColor.secondaryLabel)
-                                                                        )
-                                                                }
-                                                                
-                                                                Text(diff <= 0 ? "准时" : "最新 \(formatter.string(from: arrivingTime))")
-                                                                    .font(.caption)
-                                                                    .foregroundStyle(
-                                                                        schedule.time == activeSchedule?.time ? (diff <= 0 ? Color.green : Color.red) : Color(UIColor.tertiaryLabel)
-                                                                    )
-                                                            } else {
+                    }
+                    
+                    if selection != nil {
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack {
+                                Text("临近出发班次")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                Spacer()
+                            }
+                            .padding([.leading, .trailing])
+                            
+                            if stationSchedules != nil, comingSchedules.count > 0 {
+                                ScrollView(.horizontal) {
+                                    HStack(spacing: 8) {
+                                        ForEach(Array(zip(comingSchedules.indices, comingSchedules)), id: \.1.time) { index, schedule in
+                                            VStack {
+                                                Button {
+                                                    activeSchedule = schedule
+                                                    scheduleScrollPosition.scrollTo(id: schedule.time)
+                                                } label: {
+                                                    VStack(spacing: 0) {
+                                                        let time = formatter.date(from: schedule.time)!
+                                                        
+                                                        if index == 0, let arrivingBus, abs(Date.now.addSeconds(arrivingBus.time).secondsFromTime(time)) <= 300 {
+                                                            let arrivingTime = Date.now.addSeconds(arrivingBus.time)
+                                                            let diff = arrivingTime.secondsFromTime(time)
+                                                            
+                                                            HStack(spacing: 2) {
                                                                 Text(schedule.time)
                                                                     .fontWeight(
                                                                         schedule.time == activeSchedule?.time ?
@@ -481,255 +407,278 @@ struct BusMapSheet: View {
                                                                     .foregroundStyle(
                                                                         schedule.time == activeSchedule?.time ? Color(UIColor.label) : Color(UIColor.secondaryLabel)
                                                                     )
-
-                                                                Text("计划")
-                                                                    .font(.caption)
+                                                                
+                                                                Image(systemName: "dot.radiowaves.up.forward")
+                                                                    .resizable()
+                                                                    .scaledToFit()
+                                                                    .frame(width: 12, height: 12)
                                                                     .foregroundStyle(
-                                                                        schedule.time == activeSchedule?.time ? Color(UIColor.secondaryLabel) : Color(UIColor.tertiaryLabel)
+                                                                        schedule.time == activeSchedule?.time ? (diff <= 0 ? Color.green : Color.red) : Color(UIColor.secondaryLabel)
                                                                     )
                                                             }
+                                                            
+                                                            Text(diff <= 0 ? "准时" : "最新 \(formatter.string(from: arrivingTime))")
+                                                                .font(.caption)
+                                                                .foregroundStyle(
+                                                                    schedule.time == activeSchedule?.time ? (diff <= 0 ? Color.green : Color.red) : Color(UIColor.tertiaryLabel)
+                                                                )
+                                                        } else {
+                                                            Text(schedule.time)
+                                                                .fontWeight(
+                                                                    schedule.time == activeSchedule?.time ?
+                                                                        .semibold : .medium
+                                                                )
+                                                                .foregroundStyle(
+                                                                    schedule.time == activeSchedule?.time ? Color(UIColor.label) : Color(UIColor.secondaryLabel)
+                                                                )
+                                                            
+                                                            Text("计划")
+                                                                .font(.caption)
+                                                                .foregroundStyle(
+                                                                    schedule.time == activeSchedule?.time ? Color(UIColor.secondaryLabel) : Color(UIColor.tertiaryLabel)
+                                                                )
                                                         }
-                                                        .padding([.leading, .trailing])
-                                                        .padding([.top, .bottom], 8)
                                                     }
-                                                    .buttonStyle(.plain)
+                                                    .padding([.leading, .trailing])
+                                                    .padding([.top, .bottom], 8)
                                                 }
-                                                .background(
-                                                    schedule.time == activeSchedule?.time ? Color(UIColor.secondarySystemGroupedBackground) : Color(UIColor.tertiarySystemGroupedBackground)
-                                                )
-                                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                                .if(schedule.time == activeSchedule?.time && colorScheme == .light) {
-                                                    $0.shadow(color: Color(UIColor.systemGray3), radius: 1, x: 0, y: 1)
-                                                }
-                                                .padding([.top], 8)
-                                                .padding([.bottom])
-                                                .id(schedule.time)
+                                                .buttonStyle(.plain)
                                             }
+                                            .background(
+                                                schedule.time == activeSchedule?.time ? Color(UIColor.secondarySystemGroupedBackground) : Color(UIColor.tertiarySystemGroupedBackground)
+                                            )
+                                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                            .if(schedule.time == activeSchedule?.time && colorScheme == .light) {
+                                                $0.shadow(color: Color(UIColor.systemGray3), radius: 1, x: 0, y: 1)
+                                            }
+                                            .padding([.top], 8)
+                                            .padding([.bottom])
+                                            .id(schedule.time)
                                         }
                                     }
-                                    .frame(maxWidth: .infinity)
-                                    .scrollIndicators(.hidden)
-                                    .scrollPosition($scheduleScrollPosition)
-                                    .contentMargins([.leading, .trailing], 14, for: .scrollContent)
-                                } else if stationSchedules != nil, comingSchedules.count == 0 {
-                                    VStack {
-                                        Text("今日运营已结束")
-                                            .padding()
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color(UIColor.secondarySystemGroupedBackground))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                    .padding([.leading, .trailing, .bottom])
-                                    .padding([.top], 8)
-                                } else {
-                                    VStack {
-                                        ProgressView().padding()
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding([.leading, .trailing, .bottom])
                                 }
+                                .frame(maxWidth: .infinity)
+                                .scrollIndicators(.hidden)
+                                .scrollPosition($scheduleScrollPosition)
+                                .contentMargins([.leading, .trailing], 14, for: .scrollContent)
+                            } else if stationSchedules != nil, comingSchedules.count == 0 {
+                                VStack {
+                                    Text("今日运营已结束")
+                                        .padding()
+                                }
+                                .frame(maxWidth: .infinity)
+                                .background(Color(UIColor.secondarySystemGroupedBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .padding([.leading, .trailing, .bottom])
+                                .padding([.top], 8)
+                            } else {
+                                VStack {
+                                    ProgressView().padding()
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding([.leading, .trailing, .bottom])
                             }
-                            .frame(height: 96, alignment: .top)
-                            .animation(.easeInOut, value: stationSchedules)
-                            .animation(.easeInOut, value: comingSchedules)
+                        }
+                        .frame(height: 96, alignment: .top)
+                        .animation(.easeInOut, value: stationSchedules)
+                        .animation(.easeInOut, value: comingSchedules)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("停靠站")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Button {
+                                showAllStations.toggle()
+                            } label: {
+                                showAllStations ? Text("收起") : Text("更多")
+                            }
+                            .tint(.blue)
                         }
                         
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("停靠站")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                Spacer()
-                                Button {
-                                    showAllStations.toggle()
-                                } label: {
-                                    showAllStations ? Text("收起") : Text("更多")
-                                }
-                                .tint(.blue)
-                            }
-                            
-                            VStack(spacing: 0) {
-                                if stations.count > 0 {
-                                    var startIndex: Int {
-                                        if let selection, let selectStation = stations.firstIndex(where: { $0.id == selection }) {
-                                            return selectStation
-                                        } else {
-                                            return 0
-                                        }
+                        VStack(spacing: 0) {
+                            if stations.count > 0 {
+                                var startIndex: Int {
+                                    if let selection, let selectStation = stations.firstIndex(where: { $0.id == selection }) {
+                                        return selectStation
+                                    } else {
+                                        return 0
                                     }
+                                }
+                                
+                                if !showAllStations && startIndex - 1 > 0 {
+                                    HStack(spacing: 0) {
+                                        // dot and line
+                                        ZStack {
+                                            Line()
+                                                .stroke(style: StrokeStyle(lineWidth: 4, dash: [5]))
+                                                .fill(Color(UIColor.systemGray2))
+                                                .frame(width: 4)
+                                                .offset(x: 2)
+                                        }
+                                        .frame(width: 36, height: 24)
+                                        
+                                        // station name
+                                        Text("前\(startIndex - 1)站")
+                                            .foregroundStyle(Color(UIColor.systemGray2))
+                                        
+                                        Spacer()
+                                        // time
+                                    }
+                                    .padding([.leading, .trailing])
+                                }
+                                
+                                let lowerBound = showAllStations ? 0 : max(0, startIndex - 1)
+                                ForEach(Array(stations[lowerBound..<stations.count]), id: \.id) { station in
+                                    let index = stations.firstIndex { $0.id == station.id }!
                                     
-                                    if !showAllStations && startIndex - 1 > 0 {
+                                    if index < startIndex {
                                         HStack(spacing: 0) {
                                             // dot and line
-                                            ZStack {
-                                                Line()
-                                                    .stroke(style: StrokeStyle(lineWidth: 4, dash: [5]))
+                                            ZStack(alignment: .center) {
+                                                if index != 0 {
+                                                    Rectangle()
+                                                        .fill(Color(UIColor.systemGray2))
+                                                        .frame(width: 4, height: 24)
+                                                        .position(x: 18, y: 12)
+                                                }
+                                                
+                                                Rectangle()
                                                     .fill(Color(UIColor.systemGray2))
-                                                    .frame(width: 4)
-                                                    .offset(x: 2)
+                                                    .frame(width: 4, height: 24)
+                                                    .position(x: 18, y: 36)
+                                                
+                                                if index == 0{
+                                                    Circle()
+                                                        .fill(Color(UIColor.systemGray2))
+                                                        .stroke(Color(UIColor.systemBackground), lineWidth: 0.5)
+                                                        .frame(width: 12, height: 12)
+                                                        .position(x: 18, y: 24)
+                                                } else {
+                                                    Circle()
+                                                        .fill(Color(UIColor.systemBackground))
+                                                        .stroke(Color(UIColor.systemGray2), lineWidth: 2)
+                                                        .frame(width: 8, height: 8)
+                                                        .position(x: 18, y: 24)
+                                                }
                                             }
-                                            .frame(width: 36, height: 24)
+                                            .frame(width: 36, height: 48)
                                             
                                             // station name
-                                            Text("前\(startIndex - 1)站")
-                                                .foregroundStyle(Color(UIColor.systemGray2))
+                                            Button {
+                                                if station.id != stations.last?.id {
+                                                    selection = station.id
+                                                }
+                                            } label: {
+                                                Text(station.station.name)
+                                                    .fontWeight(station.id == selection ? .semibold : .regular)
+                                                    .foregroundStyle(Color(UIColor.systemGray2))
+                                            }
+                                            .buttonStyle(.plain)
                                             
                                             Spacer()
                                             // time
                                         }
                                         .padding([.leading, .trailing])
-                                    }
-                                    
-                                    let lowerBound = showAllStations ? 0 : max(0, startIndex - 1)
-                                    ForEach(Array(stations[lowerBound..<stations.count]), id: \.id) { station in
-                                        let index = stations.firstIndex { $0.id == station.id }!
-                                        
-                                        if index < startIndex {
-                                            HStack(spacing: 0) {
-                                                // dot and line
-                                                ZStack(alignment: .center) {
-                                                    if index != 0 {
-                                                        Rectangle()
-                                                            .fill(Color(UIColor.systemGray2))
-                                                            .frame(width: 4, height: 24)
-                                                            .position(x: 18, y: 12)
-                                                    }
-                                                    
+                                    } else {
+                                        HStack(spacing: 0) {
+                                            // dot and line
+                                            ZStack(alignment: .center) {
+                                                if index != 0 {
                                                     Rectangle()
-                                                        .fill(Color(UIColor.systemGray2))
+                                                        .fill(startIndex == index ? Color(UIColor.systemGray2) : Color.blue)
+                                                        .frame(width: 4, height: 24)
+                                                        .position(x: 18, y: 12)
+                                                }
+                                                
+                                                if index != stations.count - 1 {
+                                                    Rectangle()
+                                                        .fill(Color.blue)
                                                         .frame(width: 4, height: 24)
                                                         .position(x: 18, y: 36)
-                                                    
-                                                    if index == 0{
-                                                        Circle()
-                                                            .fill(Color(UIColor.systemGray2))
-                                                            .stroke(Color(UIColor.systemBackground), lineWidth: 0.5)
-                                                            .frame(width: 12, height: 12)
-                                                            .position(x: 18, y: 24)
-                                                    } else {
-                                                        Circle()
-                                                            .fill(Color(UIColor.systemBackground))
-                                                            .stroke(Color(UIColor.systemGray2), lineWidth: 2)
-                                                            .frame(width: 8, height: 8)
-                                                            .position(x: 18, y: 24)
-                                                    }
                                                 }
-                                                .frame(width: 36, height: 48)
                                                 
-                                                // station name
-                                                Button {
-                                                    if station.id != stations.last?.id {
-                                                        selection = station.id
-                                                    }
-                                                } label: {
-                                                    Text(station.station.name)
-                                                        .fontWeight(station.id == selection ? .semibold : .regular)
-                                                        .foregroundStyle(Color(UIColor.systemGray2))
+                                                if station.id == selection {
+                                                    Circle()
+                                                        .fill(Color(UIColor.systemBackground))
+                                                        .stroke(Color.blue, lineWidth: 4)
+                                                        .frame(width: 12, height: 12)
+                                                        .position(x: 18, y: 24)
+                                                } else if index == 0 || index == stations.count - 1 {
+                                                    Circle()
+                                                        .fill(Color.blue)
+                                                        .stroke(Color(UIColor.systemBackground), lineWidth: 0.5)
+                                                        .frame(width: 12, height: 12)
+                                                        .position(x: 18, y: 24)
+                                                } else {
+                                                    Circle()
+                                                        .fill(Color(UIColor.systemBackground))
+                                                        .stroke(Color.blue, lineWidth: 2)
+                                                        .frame(width: 8, height: 8)
+                                                        .position(x: 18, y: 24)
                                                 }
-                                                .buttonStyle(.plain)
-                                                
-                                                Spacer()
-                                                // time
                                             }
-                                            .padding([.leading, .trailing])
-                                        } else {
-                                            HStack(spacing: 0) {
-                                                // dot and line
-                                                ZStack(alignment: .center) {
-                                                    if index != 0 {
-                                                        Rectangle()
-                                                            .fill(startIndex == index ? Color(UIColor.systemGray2) : Color.blue)
-                                                            .frame(width: 4, height: 24)
-                                                            .position(x: 18, y: 12)
-                                                    }
-                                                    
-                                                    if index != stations.count - 1 {
-                                                        Rectangle()
-                                                            .fill(Color.blue)
-                                                            .frame(width: 4, height: 24)
-                                                            .position(x: 18, y: 36)
-                                                    }
-                                                    
-                                                    if station.id == selection {
-                                                        Circle()
-                                                            .fill(Color(UIColor.systemBackground))
-                                                            .stroke(Color.blue, lineWidth: 4)
-                                                            .frame(width: 12, height: 12)
-                                                            .position(x: 18, y: 24)
-                                                    } else if index == 0 || index == stations.count - 1 {
-                                                        Circle()
-                                                            .fill(Color.blue)
-                                                            .stroke(Color(UIColor.systemBackground), lineWidth: 0.5)
-                                                            .frame(width: 12, height: 12)
-                                                            .position(x: 18, y: 24)
-                                                    } else {
-                                                        Circle()
-                                                            .fill(Color(UIColor.systemBackground))
-                                                            .stroke(Color.blue, lineWidth: 2)
-                                                            .frame(width: 8, height: 8)
-                                                            .position(x: 18, y: 24)
-                                                    }
+                                            .frame(width: 36, height: 48)
+                                            
+                                            // station name
+                                            Button {
+                                                if station.id != stations.last?.id {
+                                                    selection = station.id
                                                 }
-                                                .frame(width: 36, height: 48)
-                                                
-                                                // station name
-                                                Button {
-                                                    if station.id != stations.last?.id {
-                                                        selection = station.id
-                                                    }
-                                                } label: {
-                                                    Text(station.station.name)
-                                                        .fontWeight(station.id == selection ? .semibold : .regular)
-                                                }
-                                                .buttonStyle(.plain)
-                                                
-                                                Spacer()
-                                                // time
-                                                if let activeSchedule, let selection {
-                                                    var time: String {
-                                                        if let stationIndex = stations.firstIndex(where: { $0.id == selection }) {
-                                                            var scheduleTime = formatter.date(from: activeSchedule.time)!
-                                                            
-                                                            for i in 0...stationIndex {
-                                                                let time = (i == 1 && stations[0].stationCode == "FFFF43") ? 10 : stations[i].time
-                                                                scheduleTime = scheduleTime.addMinutes(-time)
-                                                            }
-                                                            
-                                                            for i in 0...index {
-                                                                let time = (i == 1 && stations[0].stationCode == "FFFF43") ? 10 : stations[i].time
-                                                                scheduleTime = scheduleTime.addMinutes(time)
-                                                            }
-                                                            
-                                                            if index == stations.count - 1 && stations[index].stationCode == "FFFF43" {
-                                                                scheduleTime = scheduleTime.addMinutes(10)
-                                                            }
-                                                            
-                                                            return formatter.string(from: scheduleTime)
+                                            } label: {
+                                                Text(station.station.name)
+                                                    .fontWeight(station.id == selection ? .semibold : .regular)
+                                            }
+                                            .buttonStyle(.plain)
+                                            
+                                            Spacer()
+                                            // time
+                                            if let activeSchedule, let selection {
+                                                var time: String {
+                                                    if let stationIndex = stations.firstIndex(where: { $0.id == selection }) {
+                                                        var scheduleTime = formatter.date(from: activeSchedule.time)!
+                                                        
+                                                        for i in 0...stationIndex {
+                                                            let time = (i == 1 && stations[0].stationCode == "FFFF43") ? 10 : stations[i].time
+                                                            scheduleTime = scheduleTime.addMinutes(-time)
                                                         }
-                                                        return ""
+                                                        
+                                                        for i in 0...index {
+                                                            let time = (i == 1 && stations[0].stationCode == "FFFF43") ? 10 : stations[i].time
+                                                            scheduleTime = scheduleTime.addMinutes(time)
+                                                        }
+                                                        
+                                                        if index == stations.count - 1 && stations[index].stationCode == "FFFF43" {
+                                                            scheduleTime = scheduleTime.addMinutes(10)
+                                                        }
+                                                        
+                                                        return formatter.string(from: scheduleTime)
                                                     }
-                                                    
-                                                    Text(time)
-                                                        .font(.callout)
+                                                    return ""
                                                 }
+                                                
+                                                Text(time)
+                                                    .font(.callout)
                                             }
-                                            .padding([.leading, .trailing])
                                         }
+                                        .padding([.leading, .trailing])
                                     }
-                                } else {
-                                    ProgressView()
-                                        .padding()
                                 }
+                            } else {
+                                ProgressView()
+                                    .padding()
                             }
-                            .frame(maxWidth: .infinity)
-                            .background(Color(UIColor.secondarySystemGroupedBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .animation(.easeInOut, value: showAllStations)
                         }
-                        .animation(.easeInOut, value: selection)
-                        .animation(.easeInOut, value: stations)
-                        .padding([.leading, .trailing])
+                        .frame(maxWidth: .infinity)
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .animation(.easeInOut, value: showAllStations)
                     }
+                    .animation(.easeInOut, value: selection)
+                    .animation(.easeInOut, value: stations)
+                    .padding([.leading, .trailing])
                 }
             }
             .scrollPosition($containerScrollPosition)
@@ -843,8 +792,7 @@ class XMLCarParser: NSObject, XMLParserDelegate {
 }
 
 struct BusMapView: View {
-    @State private var lines: [BusLine] = []
-    @State private var selectedLine: BusLine?
+    var selectedLine: BusLine
     @State private var route: BusRoute?
     @State private var stations: [BusStation] = []
     @State private var position: MapCameraPosition = .camera(
@@ -887,14 +835,14 @@ struct BusMapView: View {
                 //            }
                 
                 var filteredStations: [BusStation] {
-                    if stations.count > 1, selectedLine?.direction == 0 {
+                    if selectedLine.lineCode == "918484", stations.count > 1, selectedLine.direction == 0 {
                         return Array(stations[1..<stations.count])
                     } else {
                         return stations
                     }
                 }
                 ForEach(filteredStations, id: \.id) { station in
-                    Marker(station.station.name, systemImage: "\(station.index - 1).circle.fill", coordinate: station.station.location.coordinate())
+                    Marker(station.station.name, systemImage: "\(selectedLine.lineCode == "918484" ? station.index - 1 : station.index).circle.fill", coordinate: station.station.location.coordinate())
                         .tint(.blue)
                         .tag(station.id)
                 }
@@ -943,7 +891,7 @@ struct BusMapView: View {
             //            }
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
-            .navigationTitle("校园巴士")
+            // .navigationTitle("校园巴士")
             .animation(.easeInOut, value: websocket.vehicles)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -962,29 +910,90 @@ struct BusMapView: View {
                 NavigationStack {
                     BusMapSheet(
                         stations: stations,
-                        lines: lines,
-                        selectedLine: $selectedLine,
+                        selectedLine: selectedLine,
                         selection: $selection
                     )
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .principal) {
+                            VStack(alignment: .center, spacing: 3) {
+                                let startStation = stations.first?.station.name ?? ""
+                                let endStation = stations.last?.station.name ?? ""
+                                
+                                Text(selectedLine.name)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                if stations.first == nil {
+                                    Text(" ")
+                                        .font(.callout)
+                                        .foregroundStyle(Color(UIColor.secondaryLabel))
+                                } else if startStation == endStation {
+                                    Text(selectedLine.direction == 0 ? "顺时针" : "逆时针")
+                                        .font(.callout)
+                                        .foregroundStyle(Color(UIColor.secondaryLabel))
+                                } else {
+                                    Text("开往 \(endStation)")
+                                        .font(.callout)
+                                        .foregroundStyle(Color(UIColor.secondaryLabel))
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
                 }
                 .interactiveDismissDisabled()
                 .presentationBackgroundInteraction(.enabled)
                 .presentationDetents([.fraction(0.2), .fraction(0.5), .large], selection: $sheetDetent)
                 .presentationDragIndicator(.visible)
-                .presentationBackground(.ultraThickMaterial)
-                .ignoresSafeArea()
+                // .presentationBackground(.ultraThickMaterial)
+                // .ignoresSafeArea()
                 .animation(.easeInOut, value: selectedLine)
                 .animation(.easeInOut, value: stations)
             }
             .task {
                 do {
-                    lines = try await AF.request("https://campuslife.sjtu.edu.cn/api/v1/shuttle")
-                        .serializingDecodable(BusResponse<BusLine>.self)
-                        .value
-                        .data
-                    selectedLine = lines.first
+                    websocket.connect(lineCode: selectedLine.lineCode, direction: selectedLine.direction)
+                    
+                    await withTaskGroup(of: Void.self) { group in
+                        group.addTask {
+                            do {
+                                let route = try await AF.request("https://campuslife.sjtu.edu.cn/api/v1/shuttle/\(selectedLine.lineCode)/\(selectedLine.direction)/route")
+                                    .serializingDecodable(BusResponse<BusRoute>.self)
+                                    .value
+                                    .data
+                                    .first
+                                Task { @MainActor in
+                                    self.route = route
+                                }
+                            } catch {
+                                print(error)
+                            }
+                        }
+                        
+                        group.addTask {
+                            do {
+                                let stations = try await AF.request("https://campuslife.sjtu.edu.cn/api/v1/shuttle/\(selectedLine.lineCode)/\(selectedLine.direction)/stations")
+                                    .serializingDecodable(BusResponse<BusStation>.self)
+                                    .value
+                                    .data
+                                Task { @MainActor in
+                                    self.stations = stations
+                                }
+                            } catch {
+                                print(error)
+                            }
+                        }
+                    }
                 } catch {
                     print(error)
+                }
+            }
+            .task {
+                if selectedLine.lineCode != "918484" {
+                    position = .camera(
+                        .init(centerCoordinate: .init(latitude: 31.033039, longitude: 121.442041), distance: 9963.584473701083)
+                    )
                 }
             }
             .sensoryFeedback(.selection, trigger: selection)
@@ -994,45 +1003,6 @@ struct BusMapView: View {
                         position = .camera(
                             .init(centerCoordinate: station.station.location.coordinate(), distance: 3600)
                         )
-                    }
-                }
-            }
-            .onChange(of: selectedLine) {
-                if let selectedLine {
-                    selection = nil
-                    websocket.connect(lineCode: selectedLine.lineCode, direction: selectedLine.direction)
-                    
-                    Task {
-                        await withTaskGroup(of: Void.self) { group in
-                            group.addTask {
-                                do {
-                                    let route = try await AF.request("https://campuslife.sjtu.edu.cn/api/v1/shuttle/\(selectedLine.lineCode)/\(selectedLine.direction)/route")
-                                        .serializingDecodable(BusResponse<BusRoute>.self)
-                                        .value
-                                        .data
-                                        .first
-                                    Task { @MainActor in
-                                        self.route = route
-                                    }
-                                } catch {
-                                    print(error)
-                                }
-                            }
-                            
-                            group.addTask {
-                                do {
-                                    let stations = try await AF.request("https://campuslife.sjtu.edu.cn/api/v1/shuttle/\(selectedLine.lineCode)/\(selectedLine.direction)/stations")
-                                        .serializingDecodable(BusResponse<BusStation>.self)
-                                        .value
-                                        .data
-                                    Task { @MainActor in
-                                        self.stations = stations
-                                    }
-                                } catch {
-                                    print(error)
-                                }
-                            }
-                        }
                     }
                 }
             }

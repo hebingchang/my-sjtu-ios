@@ -105,11 +105,20 @@ extension Date {
     }
     
     func weeksSince(_ date: Date, using calendar: Calendar = .iso8601) -> Int {
-        Int(self.startOfWeek().timeIntervalSince(date.startOfWeek()) / (7 * 60 * 60 * 24))
+        let days = calendar.dateComponents(
+            [.day],
+            from: date.startOfWeek(using: calendar),
+            to: self.startOfWeek(using: calendar)
+        ).day ?? 0
+        return days / 7
     }
     
     func daysSince(_ date: Date, using calendar: Calendar = .iso8601) -> Int {
-        Int(self.startOfDay().timeIntervalSince(date.startOfDay()) / (60 * 60 * 24))
+        calendar.dateComponents(
+            [.day],
+            from: date.startOfDay(using: calendar),
+            to: self.startOfDay(using: calendar)
+        ).day ?? 0
     }
     
     func minutesSince(_ date: Date, using calendar: Calendar = .iso8601) -> Int {
@@ -121,7 +130,7 @@ extension Date {
     }
     
     func addDays(_ days: Int, using calendar: Calendar = .iso8601) -> Date {
-        calendar.date(byAdding: .day, value: days, to: noon(using: calendar))!
+        calendar.date(byAdding: .day, value: days, to: self)!
     }
     
     func addHours(_ hours: Int, using calendar: Calendar = .iso8601) -> Date {

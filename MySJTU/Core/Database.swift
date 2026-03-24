@@ -23,6 +23,21 @@ struct SchedulesRequest: ValueObservationQueryable {
     var date: Date?
     var isWeek: Bool = false
 
+    private func semesters(for college: College, at date: Date, in db: Database) throws -> [Semester] {
+        if isWeek {
+            let weekStart = date.startOfWeek()
+            let weekEnd = weekStart.addWeeks(1)
+            return try Semester
+                .filter(Column("college") == college && Column("start_at") < weekEnd && Column("end_at") > weekStart)
+                .order(Column("start_at"))
+                .fetchAll(db)
+        }
+
+        return try Semester
+            .filter(Column("college") == college && Column("start_at") <= date && Column("end_at") > date)
+            .fetchAll(db)
+    }
+
     func fetch(_ db: Database) throws -> [ScheduleInfo] {
         guard let colleges = colleges else {
             return []
@@ -34,26 +49,35 @@ struct SchedulesRequest: ValueObservationQueryable {
         var schedules: [ScheduleInfo] = []
         
         for college in colleges {
-            let semester = try Semester
-                .filter(colleges.contains(Column("college")) && Column("start_at") <= date && Column("end_at") > date)
-                .fetchOne(db)
-            guard let semester = semester else {
+            let semesters = try semesters(for: college, at: date, in: db)
+            guard !semesters.isEmpty else {
                 return []
             }
-            let week = date.weeksSince(semester.start_at)
-            
-            // TODO: .custom
-            var filter = Column("week") == week && Column("is_start") == true && Column("college") == college
-            if !isWeek {
-                let day = (date.get(.weekday) + 5) % 7
-                filter = filter && Column("day") == day
+
+            for semester in semesters {
+                guard let week = semester.displayWeekIndex(for: date, isWeekContext: isWeek) else {
+                    continue
+                }
+
+                // TODO: .custom
+                var filter = Column("week") == week && Column("is_start") == true && Column("college") == college
+                if isWeek {
+                    guard let dayRange = semester.displayDayRangeInWeek(containing: date) else {
+                        continue
+                    }
+                    filter = filter && Column("day") >= dayRange.lowerBound && Column("day") <= dayRange.upperBound
+                } else {
+                    let day = (date.get(.weekday) + 5) % 7
+                    filter = filter && Column("day") == day
+                }
+
+                let request = Schedule
+                    .including(required: Schedule.class_
+                        .including(required: Class.course)
+                        .filter(Column("semester_id") == semester.id))
+                    .filter(filter)
+                schedules.append(contentsOf: try ScheduleInfo.fetchAll(db, request))
             }
-            let request = Schedule
-                .including(required: Schedule.class_
-                    .including(required: Class.course)
-                    .filter(Column("semester_id") == semester.id))
-                .filter(filter)
-            schedules.append(contentsOf: try ScheduleInfo.fetchAll(db, request))
         }
         
         return schedules
@@ -66,6 +90,7 @@ struct SemestersRequest: ValueObservationQueryable {
     }
     var college: College?
     var date: Date?
+    var isWeek: Bool = false
 
     func fetch(_ db: Database) throws -> [Semester] {
         guard let college = college else {
@@ -73,6 +98,25 @@ struct SemestersRequest: ValueObservationQueryable {
         }
 
         if let date {
+            if isWeek {
+                let weekStart = date.startOfWeek()
+                let weekEnd = weekStart.addWeeks(1)
+                let semesters = try Semester
+                    .filter(Column("college") == college && Column("start_at") < weekEnd && Column("end_at") > weekStart)
+                    .fetchAll(db)
+
+                return semesters.sorted { lhs, rhs in
+                    let lhsDistance = lhs.distanceToDisplayWeekReference(for: date, isWeekContext: true)
+                    let rhsDistance = rhs.distanceToDisplayWeekReference(for: date, isWeekContext: true)
+
+                    if lhsDistance != rhsDistance {
+                        return lhsDistance < rhsDistance
+                    }
+
+                    return lhs.start_at < rhs.start_at
+                }
+            }
+
             return try Semester
                 .filter(Column("college") == college && Column("start_at") <= date && Column("end_at") > date)
                 .fetchAll(db)
@@ -194,7 +238,7 @@ class Eloquent {
             let dbURL = FileManager.default
                 .containerURL(forSecurityApplicationGroupIdentifier: "group.com.boar.sjct")!
                 .appendingPathComponent("class_table.db")
-
+            
             Eloquent.pool = try openSharedDatabase(at: dbURL)
         } catch {
             throw error
@@ -342,6 +386,13 @@ class Eloquent {
                 t.column("category", .text)
                 t.column("college", .integer)
                 t.column("color", .text)
+            }
+        }
+        
+        // v4
+        migrator.registerMigration("add_custom_semester_name") { db in
+            try db.alter(table: "semesters") { t in
+                t.add(column: "name", .text)
             }
         }
         

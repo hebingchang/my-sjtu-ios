@@ -71,6 +71,21 @@ let CollegeTimeTable: Dictionary<College, TimeTable> = [
         Period(id: 13, start: "20:25", finish: "21:10"),
         Period(id: 14, start: "21:15", finish: "22:00"),
     ],
+    College.joint: [
+        Period(id: 0, start: "8:00", finish: "8:45"),
+        Period(id: 1, start: "8:55", finish: "9:40"),
+        Period(id: 2, start: "10:00", finish: "10:45"),
+        Period(id: 3, start: "10:55", finish: "11:40"),
+        Period(id: 4, start: "12:00", finish: "12:45"),
+        Period(id: 5, start: "12:55", finish: "13:40"),
+        Period(id: 6, start: "14:00", finish: "14:45"),
+        Period(id: 7, start: "14:55", finish: "15:40"),
+        Period(id: 8, start: "16:00", finish: "16:45"),
+        Period(id: 9, start: "16:55", finish: "17:40"),
+        Period(id: 10, start: "18:00", finish: "18:45"),
+        Period(id: 11, start: "18:55", finish: "19:40"),
+        Period(id: 12, start: "19:40", finish: "20:20"),
+    ],
     College.shsmu: [
         Period(id: 0, start: "8:00", finish: "8:40"),
         Period(id: 1, start: "8:50", finish: "9:30"),
@@ -114,6 +129,12 @@ let ClassColors: ClassColorsType = [
   "#66327C",
   "#622954",
   "#C1328E",
+  "#8E354A",
+  "#C73E3A",
+  "#00896C",
+  "#006284",
+  "#0F4C3A",
+  "#CA7A2C"
 ];
 
 extension ClassColorsType {

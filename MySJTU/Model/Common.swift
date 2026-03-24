@@ -9,6 +9,7 @@ enum College: Int {
     case sjtu = 1
     case shsmu = 2
     case sjtug = 3
+    case joint = 4
 }
 
 enum CustomScheduleCategory: String, Codable {

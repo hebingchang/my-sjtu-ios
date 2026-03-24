@@ -9,6 +9,7 @@ import SwiftUI
 
 struct CollegeItem: Identifiable {
     let id: College
+    let category: String
     let name: String
 }
 
@@ -16,7 +17,7 @@ struct ProfileView: View {
     @EnvironmentObject private var appConfig: AppConfig
     @AppStorage("accounts") var accounts: [WebAuthAccount] = []
     @State private var hideTabBar: Bool = false
-
+    
     var body: some View {
         NavigationStack {
             List {
@@ -34,15 +35,15 @@ struct ProfileView: View {
                             Label("数据源", systemImage: "square.and.arrow.down")
                         }
                         
-                        /* NavigationLink {
-                         CustomizeView()
-                         } label: {
-                         Label("个性化", systemImage: "paintpalette")
-                         } */
+                        NavigationLink {
+                            CustomizeView()
+                        } label: {
+                            Label("个性化", systemImage: "paintpalette")
+                        }
                     }
                 }
                 
-                Section(header: Text("实用工具")) {
+                Section(header: Text("学在交大")) {
                     if let account = (accounts.first {
                         $0.provider == .jaccount
                     }), account.enabledFeatures.contains(.canvas), account.bizData["canvas_token"] != nil {
@@ -58,10 +59,28 @@ struct ProfileView: View {
                     } label: {
                         Label("教务通知", systemImage: "megaphone")
                     }
+
+                    NavigationLink {
+                        SelfStudyClassroomView()
+                    } label: {
+                        Label("自习教室", systemImage: "studentdesk")
+                    }
                     
                     if let account = (accounts.first {
                         $0.provider == .jaccount
-                    }), account.enabledFeatures.contains(.campus_card) {
+                    }), account.enabledFeatures.contains(.examAndGrade) {
+                        NavigationLink {
+                            ExamView()
+                        } label: {
+                            Label("考试与成绩", systemImage: "pencil.and.list.clipboard")
+                        }
+                    }
+                }
+                
+                Section(header: Text("交大生活")) {
+                    if let account = (accounts.first {
+                        $0.provider == .jaccount
+                    }), account.enabledFeatures.contains(.campusCard) {
                         NavigationLink {
                             CampusCardListView()
                         } label: {
@@ -70,10 +89,16 @@ struct ProfileView: View {
                     }
                     
                     NavigationLink {
-                        BusMapView()
+                        BusListView()
                     } label: {
-                        Label("校园巴士", systemImage: "bus")
+                        Label("校园巴士", systemImage: "bus.fill")
                     }
+
+//                    NavigationLink {
+//                        PanoramaScreen()
+//                    } label: {
+//                        Label("VR", systemImage: "bus.fill")
+//                    }
                 }
                 
                 NavigationLink {

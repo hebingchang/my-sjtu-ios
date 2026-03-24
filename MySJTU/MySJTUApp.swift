@@ -79,11 +79,12 @@ struct MySJTUApp: App {
                                     semester.college = .sjtug
                                     return semester
                                 }
+                                let jointSemesters = try await getSemesters(college: .joint)
                                 let shsmuSemesters = try await getSemesters(college: .shsmu)
                                 
                                 try await pool.write { db in
                                     do {
-                                        try (sjtuSemesters + sjtugSemesters + shsmuSemesters).forEach { semester in
+                                        try (sjtuSemesters + sjtugSemesters + jointSemesters + shsmuSemesters).forEach { semester in
                                             try semester.save(db)
                                         }
                                     } catch {}

@@ -509,7 +509,7 @@ struct CampusCardView: View {
                             }
                         }
                         
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(backgroundColor)
                             .frame(width: 40, height: 40)
                             .overlay {
