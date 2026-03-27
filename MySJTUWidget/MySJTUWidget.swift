@@ -695,24 +695,6 @@ private struct WidgetCardBackground: View {
                         )
                 }
             }
-            .overlay(alignment: .leading) {
-                if emphasized, let accentColor {
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: accentColor, opacity: accentTopOpacity),
-                                    Color(hex: accentColor, opacity: accentBottomOpacity)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: WidgetCardSurfaceLayout.accentWidth, height: WidgetCardSurfaceLayout.accentHeight)
-                        .padding(.leading, WidgetCardSurfaceLayout.accentInset)
-                        .padding(.vertical, WidgetCardSurfaceLayout.accentVerticalInset)
-                }
-            }
             .shadow(color: Color.black.opacity(shadowOpacity), radius: WidgetCardSurfaceLayout.shadowRadius, y: WidgetCardSurfaceLayout.shadowYOffset)
     }
 }
@@ -820,6 +802,14 @@ struct MySJTUWidgetEntryView: View {
         return .standard
     }
 
+    private var contentSpacerMinLength: CGFloat {
+        guard let schedules = entry.schedules, !schedules.isEmpty else {
+            return 6
+        }
+
+        return 0
+    }
+
     private var accessoryInlineText: String? {
         if let schedule = entry.firstSchedule {
             return schedule.isCurrent(at: entry.date) ? schedule.name : "\(schedule.start) \(schedule.name)"
@@ -877,14 +867,11 @@ struct MySJTUWidgetEntryView: View {
         HStack {
             VStack(alignment: .leading, spacing: 0) {
                 headerView
+                
+                Spacer(minLength: contentSpacerMinLength)
 
-                VStack(spacing: 2) {
-                    standardWidgetContent
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                standardWidgetContent
             }
-
-            Spacer().frame(width: 0)
         }
         .padding(6)
         .containerBackground(for: .widget) {
@@ -949,6 +936,7 @@ struct MySJTUWidgetEntryView: View {
             }
         }
         .padding([.top, .leading, .trailing], 10)
+        // .padding(.bottom, 4)
     }
 
     @ViewBuilder
@@ -1006,8 +994,7 @@ struct MySJTUWidgetEntryView: View {
     private var emptyStateCard: some View {
         cardContainer(
             alignment: .center,
-            expandsToAvailableHeight: true,
-            expandedTopInset: 6
+            expandsToAvailableHeight: true
         ) {
             VStack(spacing: 8) {
                 Text("🎉")
@@ -1032,19 +1019,19 @@ struct MySJTUWidgetEntryView: View {
         emphasized: Bool = false,
         alignment: Alignment = .leading,
         expandsToAvailableHeight: Bool = false,
-        expandedTopInset: CGFloat = 0,
         @ViewBuilder content: () -> Content
     ) -> some View {
         Group {
             if expandsToAvailableHeight {
                 VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+
                     content()
                         .frame(maxWidth: .infinity, alignment: alignment)
-                        .padding(.top, expandedTopInset)
 
                     Spacer(minLength: 0)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background {
                     WidgetCardBackground(
                         accentColor: accentColor,
@@ -1053,12 +1040,8 @@ struct MySJTUWidgetEntryView: View {
                     )
                 }
             } else {
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-
-                    content()
-                        .frame(maxWidth: .infinity, alignment: alignment)
-                }
+                content()
+                    .frame(maxWidth: .infinity, alignment: alignment)
                 .background {
                     WidgetCardBackground(
                         accentColor: accentColor,
@@ -1071,7 +1054,11 @@ struct MySJTUWidgetEntryView: View {
     }
 
     private func semesterTitle(for semester: Semester) -> String {
-        "\(String(semester.year))\(["秋", "春", "夏"][semester.semester - 1])季学期"
+        if let name = semester.name {
+            return name
+        }
+
+        return "\(String(semester.year))\(["秋", "春", "夏"][semester.semester - 1])季学期"
     }
 
     private func semesterWeekTitle(for semester: Semester) -> String {

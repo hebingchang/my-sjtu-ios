@@ -2,7 +2,7 @@
 //  ExamView.swift
 //  MySJTU
 //
-//  Created by 何炳昌 on 2025/01/05.
+//  Created by boar on 2025/01/05.
 //
 
 import SwiftUI

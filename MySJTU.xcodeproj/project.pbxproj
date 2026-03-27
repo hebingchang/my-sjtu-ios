@@ -12,6 +12,7 @@
 		5A7A25CD2CE09560003F677F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25CC2CE09560003F677F /* Lottie */; };
 		5A7A25D32CE0D795003F677F /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25D22CE0D795003F677F /* Alamofire */; };
 		5A7A25DC2CE3212E003F677F /* QRCode in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25DB2CE3212E003F677F /* QRCode */; };
+		5A7C9F0B2F768E9900B510A7 /* MySJTUWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5A7C9F012F768E9800B510A7 /* MySJTUWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5A7D7FBB2CF490C7001C6B90 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9F0FBB2CF3596F001A91B1 /* WidgetKit.framework */; };
 		5A7D7FBC2CF490C7001C6B90 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9F0FBD2CF3596F001A91B1 /* SwiftUI.framework */; };
 		5A7D7FC82CF490C8001C6B90 /* MySJTUWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5A7D7FBA2CF490C7001C6B90 /* MySJTUWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -28,6 +29,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		5A7C9F092F768E9900B510A7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5AE57A4D2CA8013700A42DE6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5A7C9F002F768E9800B510A7;
+			remoteInfo = "MySJTUWatch Watch App";
+		};
 		5A7D7FC62CF490C8001C6B90 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5AE57A4D2CA8013700A42DE6 /* Project object */;
@@ -58,6 +66,7 @@
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
+				5A7C9F0B2F768E9900B510A7 /* MySJTUWatch.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -76,6 +85,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5A7C9F012F768E9800B510A7 /* MySJTUWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MySJTUWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A7D7FBA2CF490C7001C6B90 /* MySJTUWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MySJTUWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A9F0FBB2CF3596F001A91B1 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
 		5A9F0FBD2CF3596F001A91B1 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
@@ -120,6 +130,11 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		5A7C9F022F768E9800B510A7 /* MySJTUWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MySJTUWatch;
+			sourceTree = "<group>";
+		};
 		5A7D7FBD2CF490C7001C6B90 /* MySJTUWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -150,6 +165,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		5A7C9EFE2F768E9800B510A7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5A7D7FB72CF490C7001C6B90 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -213,6 +235,7 @@
 				5AE57A692CA8013800A42DE6 /* MySJTUTests */,
 				5AE57A732CA8013800A42DE6 /* MySJTUUITests */,
 				5A7D7FBD2CF490C7001C6B90 /* MySJTUWidget */,
+				5A7C9F022F768E9800B510A7 /* MySJTUWatch */,
 				5A9F0FBA2CF3596F001A91B1 /* Frameworks */,
 				5AE57A562CA8013700A42DE6 /* Products */,
 				5AE261FA2CE50F7700412A00 /* Package.resolved */,
@@ -227,6 +250,7 @@
 				5AE57A662CA8013800A42DE6 /* MySJTUTests.xctest */,
 				5AE57A702CA8013800A42DE6 /* MySJTUUITests.xctest */,
 				5A7D7FBA2CF490C7001C6B90 /* MySJTUWidgetExtension.appex */,
+				5A7C9F012F768E9800B510A7 /* MySJTUWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -234,6 +258,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		5A7C9F002F768E9800B510A7 /* MySJTUWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5A7C9F0C2F768E9900B510A7 /* Build configuration list for PBXNativeTarget "MySJTUWatch" */;
+			buildPhases = (
+				5A7C9EFD2F768E9800B510A7 /* Sources */,
+				5A7C9EFE2F768E9800B510A7 /* Frameworks */,
+				5A7C9EFF2F768E9800B510A7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5A7C9F022F768E9800B510A7 /* MySJTUWatch */,
+			);
+			name = MySJTUWatch;
+			packageProductDependencies = (
+			);
+			productName = "MySJTUWatch Watch App";
+			productReference = 5A7C9F012F768E9800B510A7 /* MySJTUWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
 		5A7D7FB92CF490C7001C6B90 /* MySJTUWidgetExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5A7D7FC92CF490C8001C6B90 /* Build configuration list for PBXNativeTarget "MySJTUWidgetExtension" */;
@@ -272,6 +318,7 @@
 			);
 			dependencies = (
 				5A7D7FC72CF490C8001C6B90 /* PBXTargetDependency */,
+				5A7C9F0A2F768E9900B510A7 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				5A2059712D12A4DC003C850D /* Shared */,
@@ -349,9 +396,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1620;
+				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					5A7C9F002F768E9800B510A7 = {
+						CreatedOnToolsVersion = 26.4;
+					};
 					5A7D7FB92CF490C7001C6B90 = {
 						CreatedOnToolsVersion = 16.1;
 					};
@@ -401,11 +451,19 @@
 				5AE57A652CA8013800A42DE6 /* MySJTUTests */,
 				5AE57A6F2CA8013800A42DE6 /* MySJTUUITests */,
 				5A7D7FB92CF490C7001C6B90 /* MySJTUWidgetExtension */,
+				5A7C9F002F768E9800B510A7 /* MySJTUWatch */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		5A7C9EFF2F768E9800B510A7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5A7D7FB82CF490C7001C6B90 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -438,6 +496,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		5A7C9EFD2F768E9800B510A7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5A7D7FB62CF490C7001C6B90 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -469,6 +534,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		5A7C9F0A2F768E9900B510A7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5A7C9F002F768E9800B510A7 /* MySJTUWatch */;
+			targetProxy = 5A7C9F092F768E9900B510A7 /* PBXContainerItemProxy */;
+		};
 		5A7D7FC72CF490C8001C6B90 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 5A7D7FB92CF490C7001C6B90 /* MySJTUWidgetExtension */;
@@ -487,6 +557,75 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		5A7C9F0D2F768E9900B510A7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HK6N26354D;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = MySJTUWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.boar.sjct;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.boar.sjct.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		5A7C9F0E2F768E9900B510A7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HK6N26354D;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = MySJTUWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.boar.sjct;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.boar.sjct.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
 		5A7D7FCA2CF490C8001C6B90 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -495,7 +634,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTUWidget/MySJTUWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 137;
+				CURRENT_PROJECT_VERSION = 139;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -535,7 +674,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTUWidget/MySJTUWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 137;
+				CURRENT_PROJECT_VERSION = 139;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -693,7 +832,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTU/MySJTU.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 137;
+				CURRENT_PROJECT_VERSION = 139;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MySJTU/Preview Content\"";
 				DEVELOPMENT_TEAM = HK6N26354D;
@@ -702,7 +841,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MySJTU/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "交课表";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "需要定位信息以在地图中显示您的当前位置。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -747,7 +888,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTU/MySJTU.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 137;
+				CURRENT_PROJECT_VERSION = 139;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MySJTU/Preview Content\"";
 				DEVELOPMENT_TEAM = HK6N26354D;
@@ -756,7 +897,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MySJTU/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "交课表";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "需要定位信息以在地图中显示您的当前位置。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -794,7 +937,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 137;
+				CURRENT_PROJECT_VERSION = 139;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -818,7 +961,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 137;
+				CURRENT_PROJECT_VERSION = 139;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -841,7 +984,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 137;
+				CURRENT_PROJECT_VERSION = 139;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -864,7 +1007,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 137;
+				CURRENT_PROJECT_VERSION = 139;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -886,6 +1029,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		5A7C9F0C2F768E9900B510A7 /* Build configuration list for PBXNativeTarget "MySJTUWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A7C9F0D2F768E9900B510A7 /* Debug */,
+				5A7C9F0E2F768E9900B510A7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		5A7D7FC92CF490C8001C6B90 /* Build configuration list for PBXNativeTarget "MySJTUWidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -22,6 +22,14 @@ struct BrowserView: View {
     @State private var isLoading: Bool = false
     @State private var estimatedProgress: Double = 0
     @Environment(\.dismiss) var dismiss
+    
+    private var displayHost: String {
+        currentUrl?.host() ?? urlRequest.url?.host() ?? ""
+    }
+    
+    private var progressValue: Double {
+        min(max(estimatedProgress, 0), 1)
+    }
 
     var body: some View {
         NavigationStack {
@@ -42,62 +50,66 @@ struct BrowserView: View {
             .toolbarBackgroundVisibility(.visible, for: .navigationBar, .bottomBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    HStack {
-                        Image(systemName: "lock.fill")
-                            .font(.caption2)
-                        if let currentUrl {
-                            Text(currentUrl.host() ?? "")
-                                .font(.headline)
-                        } else {
-                            Text(urlRequest.url?.host() ?? "")
-                                .font(.headline)
+                    VStack(spacing: isLoading ? 6 : 0) {
+                        Text(displayHost)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        
+                        if isLoading {
+                            ProgressView(value: progressValue)
+                                .progressViewStyle(.linear)
+                                .frame(width: 160)
+                                .animation(.easeInOut(duration: 0.18), value: progressValue)
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .move(edge: .top).combined(with: .opacity),
+                                        removal: .move(edge: .top).combined(with: .opacity)
+                                    )
+                                )
                         }
                     }
+                    .animation(.easeInOut(duration: 0.2), value: isLoading)
                 }
                 
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
+                    Button {
                         self.dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
                     }
-                    .fontWeight(.medium)
+                    .accessibilityLabel("关闭")
                 }
                 
-                ToolbarItem(placement: .topBarTrailing) {
-                    VStack {
-                        if isLoading {
-                            CircularProgressView(progress: estimatedProgress)
-                        }
-                    }
-                    .frame(width: 18, height: 18)
-                    .animation(.easeInOut, value: isLoading)
-                }
-                
-                ToolbarItem(placement: .bottomBar) {
+                ToolbarItemGroup(placement: .bottomBar) {
                     Button {
                         webview.goBack()
                     } label: {
                         Image(systemName: "chevron.backward")
                     }
                     .disabled(!canGoBack)
-                    .animation(.easeInOut, value: canGoBack)
-                }
-                
-                ToolbarItem(placement: .bottomBar) {
-                    Button {
-                        webview.goForward()
-                    } label: {
-                        Image(systemName: "chevron.forward")
+                    
+                    if canGoForward {
+                        Button {
+                            webview.goForward()
+                        } label: {
+                            Image(systemName: "chevron.forward")
+                        }
                     }
-                    .disabled(!canGoForward)
-                    .animation(.easeInOut, value: canGoForward)
+                }
+                    
+                ToolbarSpacer(placement: .bottomBar)
+                
+                ToolbarItemGroup(placement: .bottomBar) {
+                    Button {
+                        webview.reload()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .accessibilityLabel("刷新")
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            //                .safeAreaInset(edge: .top) {
-            //                    ProgressView(value: 0.3)
-            //                        .progressViewStyle(.linear)
-            //                        .frame(maxWidth: .infinity)
-            //                }
             .ignoresSafeArea()
         }
     }
@@ -157,11 +169,15 @@ struct WebView: UIViewRepresentable {
                     if keyPath == #keyPath(WKWebView.canGoBack) {
                         self.parent.canGoBack = webView.canGoBack
                     } else if keyPath == #keyPath(WKWebView.canGoForward) {
-                        self.parent.canGoForward = webView.canGoForward
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            self.parent.canGoForward = webView.canGoForward
+                        }
                     } else if keyPath == #keyPath(WKWebView.isLoading) {
                         self.parent.isLoading = webView.isLoading
                     } else if keyPath == #keyPath(WKWebView.estimatedProgress) {
-                        self.parent.estimatedProgress = webView.estimatedProgress
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            self.parent.estimatedProgress = webView.estimatedProgress
+                        }
                     }
                 }
             }

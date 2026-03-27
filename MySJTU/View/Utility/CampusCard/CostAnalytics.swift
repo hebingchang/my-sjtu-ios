@@ -2,7 +2,7 @@
 //  CostAnalytics.swift
 //  MySJTU
 //
-//  Created by 何炳昌 on 2024/12/24.
+//  Created by boar on 2024/12/24.
 //
 
 import SwiftUI

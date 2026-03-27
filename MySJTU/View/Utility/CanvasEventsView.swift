@@ -2,7 +2,7 @@
 //  CanvasEventsView.swift
 //  MySJTU
 //
-//  Created by 何炳昌 on 2024/12/04.
+//  Created by boar on 2024/12/04.
 //
 
 import SwiftUI

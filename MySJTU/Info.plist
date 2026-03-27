@@ -2,23 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIAppFonts</key>
-	<array>
-		<string>ChillRoundGothic_Bold.otf</string>
-	</array>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
-			<key>wx.shmhky.com</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-			</dict>
 			<key>cwc.jdcw.sjtu.edu.cn</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
@@ -29,19 +18,28 @@
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 			</dict>
+			<key>wx.shmhky.com</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
 		</dict>
 	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>ChillRoundGothic_Bold.otf</string>
+	</array>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>
-			<key>UIApplicationShortcutItemType</key>
-			<string>UnicodeAction</string>
 			<key>UIApplicationShortcutItemIconSymbolName</key>
 			<string>qrcode</string>
-			<key>UIApplicationShortcutItemTitle</key>
-			<string>思源码</string>
 			<key>UIApplicationShortcutItemSubtitle</key>
 			<string>打开思源码</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>思源码</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>UnicodeAction</string>
 		</dict>
 	</array>
 </dict>

@@ -2,7 +2,7 @@
 //  CampusCardListView.swift
 //  MySJTU
 //
-//  Created by 何炳昌 on 2024/12/14.
+//  Created by boar on 2024/12/14.
 //
 
 import SwiftUI

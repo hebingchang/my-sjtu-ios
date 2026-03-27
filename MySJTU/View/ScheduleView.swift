@@ -13,6 +13,10 @@ import UIKit
 let weekModeLeading: CGFloat = 48
 let timeSlotHeight: CGFloat = 64
 
+private func scheduleGridDividerColor(hasCustomBackgroundImage: Bool) -> Color {
+    Color(hasCustomBackgroundImage ? UIColor.systemGray4 : UIColor.systemGray5)
+}
+
 struct WeekView: View {
     @Binding var selectedDay: Date
     let week: Date
@@ -603,15 +607,7 @@ struct DayView: View {
     }
 
     private var hourGridDividerColor: Color {
-        if hasCustomBackgroundImage {
-            return Color.primary.opacity(colorScheme == .light ? 0.14 : 0.2)
-        }
-        return Color.primary.opacity(colorScheme == .light ? 0.16 : 0.24)
-    }
-
-    private var hourGridDividerHighlightColor: Color {
-        guard hasCustomBackgroundImage else { return .clear }
-        return colorScheme == .light ? Color.white.opacity(0.12) : Color.white.opacity(0.04)
+        scheduleGridDividerColor(hasCustomBackgroundImage: hasCustomBackgroundImage)
     }
 
     private struct HourAxisView: View {
@@ -635,26 +631,23 @@ struct DayView: View {
         let finish: Int
         let containerHeight: CGFloat
         let dividerColor: Color
-        let dividerHighlightColor: Color
 
         var body: some View {
             ZStack {
                 VStack(alignment: .trailing, spacing: DayView.Layout.hourSpacing) {
                     ForEach(start...finish, id: \.self) { _ in
                         VStack {
-                            Divider()
+                            Rectangle()
+                                .fill(dividerColor)
                                 .frame(height: DayView.Layout.dividerThickness)
-                                .background(dividerColor)
-                                .overlay(dividerHighlightColor)
                         }
                         .frame(height: DayView.Layout.hourHeight)
                     }
                 }
 
-                Divider()
+                Rectangle()
+                    .fill(dividerColor)
                     .frame(width: DayView.Layout.dividerThickness, height: containerHeight)
-                    .background(dividerColor)
-                    .overlay(dividerHighlightColor)
                     .position(
                         x: DayView.Layout.verticalDividerOffset,
                         y: (DayView.Layout.hourHeight + DayView.Layout.dividerThickness + containerHeight) / 2
@@ -953,8 +946,7 @@ struct DayView: View {
                     start: start,
                     finish: finish,
                     containerHeight: containerHeight,
-                    dividerColor: hourGridDividerColor,
-                    dividerHighlightColor: hourGridDividerHighlightColor
+                    dividerColor: hourGridDividerColor
                 )
 
                 ZStack(alignment: .top) {
@@ -1056,15 +1048,7 @@ struct WeekScheduleView: View {
     }
 
     private var gridDividerColor: Color {
-        if hasCustomBackgroundImage {
-            return Color.primary.opacity(colorScheme == .light ? 0.14 : 0.2)
-        }
-        return Color.primary.opacity(colorScheme == .light ? 0.16 : 0.24)
-    }
-
-    private var gridDividerHighlightColor: Color {
-        guard hasCustomBackgroundImage else { return .clear }
-        return colorScheme == .light ? Color.white.opacity(0.12) : Color.white.opacity(0.04)
+        scheduleGridDividerColor(hasCustomBackgroundImage: hasCustomBackgroundImage)
     }
 
     private var verticalDividerStrokeStyle: StrokeStyle {
@@ -1115,12 +1099,6 @@ struct WeekScheduleView: View {
                 Rectangle()
                     .fill(gridDividerColor)
                     .frame(height: dividerThickness)
-                    .overlay {
-                        if hasCustomBackgroundImage {
-                            Rectangle()
-                                .fill(gridDividerHighlightColor)
-                        }
-                    }
                     .position(
                         x: geometry.size.width / 2,
                         y: CGFloat(id) * timeSlotHeight + (CGFloat(id) - 1) * dividerThickness + dividerThickness / 2
@@ -1134,12 +1112,6 @@ struct WeekScheduleView: View {
             GeometryReader { geometry in
                 DashedVerticalLine()
                     .stroke(gridDividerColor, style: verticalDividerStrokeStyle)
-                    .overlay {
-                        if hasCustomBackgroundImage {
-                            DashedVerticalLine()
-                                .stroke(gridDividerHighlightColor, style: verticalDividerStrokeStyle)
-                        }
-                    }
                     .frame(width: dividerThickness)
                     .position(x: CGFloat(id) * geometry.size.width / 7 + dividerThickness / 2, y: geometry.size.height / 2)
             }

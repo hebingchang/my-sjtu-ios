@@ -2,7 +2,7 @@
 //  GradeGuessView.swift
 //  MySJTU
 //
-//  Created by 何炳昌 on 2025/01/18.
+//  Created by boar on 2025/01/18.
 //
 
 import SwiftUI
