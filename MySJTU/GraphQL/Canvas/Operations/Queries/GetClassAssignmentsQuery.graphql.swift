@@ -27,6 +27,9 @@ extension CanvasSchema {
       static var __selections: [ApolloAPI.Selection] { [
         .field("course", Course?.self, arguments: ["id": .variable("classId")]),
       ] }
+      static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        GetClassAssignmentsQuery.Data.self
+      ] }
 
       var course: Course? { __data["course"] }
 
@@ -41,6 +44,9 @@ extension CanvasSchema {
         static var __selections: [ApolloAPI.Selection] { [
           .field("__typename", String.self),
           .field("assignmentsConnection", AssignmentsConnection?.self),
+        ] }
+        static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          GetClassAssignmentsQuery.Data.Course.self
         ] }
 
         /// returns a list of assignments.
@@ -64,6 +70,9 @@ extension CanvasSchema {
             .field("__typename", String.self),
             .field("nodes", [Node?]?.self),
           ] }
+          static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            GetClassAssignmentsQuery.Data.Course.AssignmentsConnection.self
+          ] }
 
           /// A list of nodes.
           var nodes: [Node?]? { __data["nodes"] }
@@ -86,6 +95,9 @@ extension CanvasSchema {
               .field("name", String?.self),
               .field("submissionsConnection", SubmissionsConnection?.self),
               .field("pointsPossible", Double?.self),
+            ] }
+            static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+              GetClassAssignmentsQuery.Data.Course.AssignmentsConnection.Node.self
             ] }
 
             /// legacy canvas id
@@ -113,6 +125,9 @@ extension CanvasSchema {
                 .field("__typename", String.self),
                 .field("nodes", [Node?]?.self),
               ] }
+              static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+                GetClassAssignmentsQuery.Data.Course.AssignmentsConnection.Node.SubmissionsConnection.self
+              ] }
 
               /// A list of nodes.
               var nodes: [Node?]? { __data["nodes"] }
@@ -131,6 +146,9 @@ extension CanvasSchema {
                   .field("readState", String?.self),
                   .field("score", Double?.self),
                   .field("gradingStatus", GraphQLEnum<CanvasSchema.SubmissionGradingStatus>?.self),
+                ] }
+                static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+                  GetClassAssignmentsQuery.Data.Course.AssignmentsConnection.Node.SubmissionsConnection.Node.self
                 ] }
 
                 var attempt: Int { __data["attempt"] }

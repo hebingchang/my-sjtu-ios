@@ -27,6 +27,9 @@ extension CanvasSchema {
       static var __selections: [ApolloAPI.Selection] { [
         .field("course", Course?.self, arguments: ["id": .variable("classId")]),
       ] }
+      static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        GetClassQuery.Data.self
+      ] }
 
       var course: Course? { __data["course"] }
 
@@ -48,6 +51,9 @@ extension CanvasSchema {
           .field("syllabusBody", String?.self),
           .field("name", String.self),
           .field("assignmentsConnection", AssignmentsConnection?.self),
+        ] }
+        static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          GetClassQuery.Data.Course.self
         ] }
 
         /// legacy canvas id
@@ -80,6 +86,9 @@ extension CanvasSchema {
             .field("__typename", String.self),
             .field("nodes", [Node?]?.self),
           ] }
+          static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            GetClassQuery.Data.Course.AssignmentsConnection.self
+          ] }
 
           /// A list of nodes.
           var nodes: [Node?]? { __data["nodes"] }
@@ -99,6 +108,9 @@ extension CanvasSchema {
               .field("htmlUrl", CanvasSchema.URL?.self),
               .field("description", String?.self),
               .field("dueAt", CanvasSchema.DateTime?.self),
+            ] }
+            static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+              GetClassQuery.Data.Course.AssignmentsConnection.Node.self
             ] }
 
             /// legacy canvas id

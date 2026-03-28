@@ -6,6 +6,7 @@ import ApolloAPI
 extension CanvasSchema.Objects {
   static let MessageableUser = ApolloAPI.Object(
     typename: "MessageableUser",
-    implementedInterfaces: [CanvasSchema.Interfaces.Node.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.Node.self],
+    keyFields: nil
   )
 }

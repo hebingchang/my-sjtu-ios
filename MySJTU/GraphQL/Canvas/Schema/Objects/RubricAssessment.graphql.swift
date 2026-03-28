@@ -7,6 +7,7 @@ extension CanvasSchema.Objects {
   /// An assessment for a rubric
   static let RubricAssessment = ApolloAPI.Object(
     typename: "RubricAssessment",
-    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self],
+    keyFields: nil
   )
 }

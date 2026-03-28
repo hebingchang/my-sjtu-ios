@@ -7,6 +7,7 @@ extension CanvasSchema.Objects {
   /// The connection type for Assignment.
   static let AssignmentConnection = ApolloAPI.Object(
     typename: "AssignmentConnection",
-    implementedInterfaces: []
+    implementedInterfaces: [],
+    keyFields: nil
   )
 }

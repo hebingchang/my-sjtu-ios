@@ -6,6 +6,7 @@ import ApolloAPI
 extension CanvasSchema.Objects {
   static let MediaTrack = ApolloAPI.Object(
     typename: "MediaTrack",
-    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self],
+    keyFields: nil
   )
 }

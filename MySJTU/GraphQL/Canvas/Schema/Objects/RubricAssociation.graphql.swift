@@ -7,6 +7,7 @@ extension CanvasSchema.Objects {
   /// How a rubric is being used in a context
   static let RubricAssociation = ApolloAPI.Object(
     typename: "RubricAssociation",
-    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self],
+    keyFields: nil
   )
 }

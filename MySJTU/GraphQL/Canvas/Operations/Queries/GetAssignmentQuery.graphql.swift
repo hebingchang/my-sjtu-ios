@@ -27,6 +27,9 @@ extension CanvasSchema {
       static var __selections: [ApolloAPI.Selection] { [
         .field("assignment", Assignment?.self, arguments: ["id": .variable("assignmentId")]),
       ] }
+      static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        GetAssignmentQuery.Data.self
+      ] }
 
       var assignment: Assignment? { __data["assignment"] }
 
@@ -48,6 +51,9 @@ extension CanvasSchema {
           .field("state", GraphQLEnum<CanvasSchema.AssignmentState>.self),
           .field("dueAt", CanvasSchema.DateTime?.self),
           .field("htmlUrl", CanvasSchema.URL?.self),
+        ] }
+        static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          GetAssignmentQuery.Data.Assignment.self
         ] }
 
         /// submissions for this assignment
@@ -74,6 +80,9 @@ extension CanvasSchema {
             .field("__typename", String.self),
             .field("nodes", [Node?]?.self),
           ] }
+          static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            GetAssignmentQuery.Data.Assignment.SubmissionsConnection.self
+          ] }
 
           /// A list of nodes.
           var nodes: [Node?]? { __data["nodes"] }
@@ -92,6 +101,9 @@ extension CanvasSchema {
               .field("readState", String?.self),
               .field("score", Double?.self),
               .field("gradingStatus", GraphQLEnum<CanvasSchema.SubmissionGradingStatus>?.self),
+            ] }
+            static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+              GetAssignmentQuery.Data.Assignment.SubmissionsConnection.Node.self
             ] }
 
             var attempt: Int { __data["attempt"] }
@@ -113,6 +125,9 @@ extension CanvasSchema {
             .field("__typename", String.self),
             .field("id", CanvasSchema.ID.self),
             .field("name", String.self),
+          ] }
+          static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            GetAssignmentQuery.Data.Assignment.Course.self
           ] }
 
           var id: CanvasSchema.ID { __data["id"] }

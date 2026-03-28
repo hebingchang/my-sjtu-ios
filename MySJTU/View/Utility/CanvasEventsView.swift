@@ -6,101 +6,358 @@
 //
 
 import SwiftUI
+import Apollo
 
 struct CanvasEventsView: View {
-    @State private var loading: Bool = true
-    @State private var assignments: [CanvasSchema.GetAssignmentQuery.Data.Assignment] = []
-    @State private var courseGroup: [String?: [CanvasSchema.GetAssignmentQuery.Data.Assignment]] = [:]
+    private typealias Assignment = CanvasSchema.GetAssignmentQuery.Data.Assignment
+    private typealias SubmissionNode = CanvasSchema.GetAssignmentQuery.Data.Assignment.SubmissionsConnection.Node
+
     @AppStorage("accounts") var accounts: [WebAuthAccount] = []
+    @State private var assignments: [Assignment] = []
+    @State private var isLoading: Bool = false
+    @State private var hasLoadedOnce: Bool = false
+    @State private var loadErrorMessage: String?
+
+    private var canvasToken: String? {
+        accounts.jaccountCanvasToken
+    }
+
+    private var shouldShowInitialLoadingState: Bool {
+        assignments.isEmpty && (!hasLoadedOnce || isLoading)
+    }
 
     var body: some View {
-        let account = accounts.first {
-            $0.provider == .jaccount
-        }
-        
         ZStack {
-            let dateFormatter = ISO8601DateFormatter()
-
-            if loading {
-                VStack {
-                    ProgressView()
-                }
-                .task {
-                    do {
-                        if let account, account.enabledFeatures.contains(.canvas), let token = account.bizData["canvas_token"] {
-                            let api = CanvasAPI(token: token)
-                            let events = try await api.getUpcomingEvents()
-                            
-                            self.assignments = try await api.getAssignments(assignmentIds: events.map { $0.assignment!.id }).sorted {
-                                if $0.dueAt == nil && $1.dueAt == nil {
-                                    return $0.id > $1.id
-                                } else if $0.dueAt == nil && $1.dueAt != nil {
-                                    return false
-                                } else if $0.dueAt != nil && $1.dueAt == nil {
-                                    return true
-                                } else {
-                                    return $0.dueAt == $1.dueAt ? ($0.id > $1.id) : dateFormatter.date(from: $0.dueAt!)! > dateFormatter.date(from: $1.dueAt!)!
-                                }
+            if shouldShowInitialLoadingState {
+                CanvasLoadingView(title: "正在加载待办事项")
+            } else if let loadErrorMessage, assignments.isEmpty {
+                ContentUnavailableView {
+                    Label("无法获取待办事项", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(loadErrorMessage)
+                } actions: {
+                    if canvasToken != nil {
+                        Button("重试") {
+                            Task {
+                                await loadAssignments(force: true)
                             }
-                            self.courseGroup = Dictionary(grouping: assignments, by: { $0.course?.name })
                         }
-                    } catch {
-                        print(error)
                     }
-                    loading = false
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if assignments.isEmpty {
+                ContentUnavailableView(
+                    "暂无即将到来的待办事项",
+                    systemImage: "checkmark.circle",
+                    description: Text("Canvas 没有返回需要关注的近期待办事项。")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                let items = makeAssignmentItems(from: assignments)
+                let sections = makeCourseSections(from: items)
+
                 List {
-                    ForEach(courseGroup.sorted { $0.value[0].dueAt! > $1.value[0].dueAt! }, id: \.key) { key, value in
-                        Section(header: Text(key ?? "")) {
-                            ForEach(value, id: \.id) { assignment in
+                    ForEach(sections) { section in
+                        Section {
+                            ForEach(section.items) { item in
                                 NavigationLink {
-                                    CanvasAssignmentView(assignmentId: assignment.id, assignmentName: assignment.name ?? "")
+                                    CanvasAssignmentView(
+                                        assignmentId: item.assignmentId,
+                                        assignmentName: item.assignmentName
+                                    )
                                 } label: {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text((assignment.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
-                                                .fontWeight(.medium)
-                                            
-                                            if let dueAt = assignment.dueAt {
-                                                Text("截止时间 \(dateFormatter.date(from: dueAt)!.formatted())")
-                                                    .font(.caption)
-                                                    .foregroundColor(Color(UIColor.secondaryLabel))
-                                            }
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        if let submissions = assignment.submissionsConnection?.nodes, submissions.count > 0 {
-                                            let lastSubmission = submissions.sorted {
-                                                $0!.attempt < $1!.attempt
-                                            }.last!
-                                            
-                                            if lastSubmission?.gradingStatus == .graded, let score = lastSubmission?.score {
-                                                HStack(alignment: .bottom, spacing: 0) {
-                                                    Text("\(score.clean)")
-                                                    if let pointsPossible = assignment.pointsPossible, pointsPossible > 0 {
-                                                        Text(" / \(pointsPossible.clean)")
-                                                            .font(.caption)
-                                                    }
-                                                }
-                                            } else {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
+                                    CanvasEventAssignmentRow(item: item)
                                 }
                             }
+                        } header: {
+                            CanvasCourseSectionHeader(section: section)
                         }
                     }
+                }
+                .listStyle(.insetGrouped)
+                .contentMargins(.top, 8, for: .scrollContent)
+                .refreshable {
+                    await loadAssignments(force: true)
                 }
             }
         }
-        .navigationTitle("作业")
-        .animation(.easeInOut, value: loading)
+        .navigationTitle("待办事项")
+        .animation(.easeInOut, value: isLoading)
+        .task {
+            await loadAssignments()
+        }
+    }
+
+    private func makeAssignmentItems(from assignments: [Assignment]) -> [CanvasEventAssignmentItem] {
+        return assignments.map { assignment in
+            let dueDate = assignment.dueAt.flatMap { CanvasFormatters.iso8601.date(from: $0) }
+            let latestSubmission = latestSubmission(for: assignment)
+            let status: CanvasEventAssignmentItem.Status
+
+            if let latestSubmission, latestSubmission.gradingStatus == .graded {
+                status = .graded(
+                    score: latestSubmission.score,
+                    pointsPossible: assignment.pointsPossible
+                )
+            } else if latestSubmission != nil {
+                status = .submitted
+            } else if let dueDate, dueDate < .now {
+                status = .overdue
+            } else if dueDate == nil {
+                status = .unscheduled
+            } else {
+                status = .upcoming
+            }
+
+            return CanvasEventAssignmentItem(
+                assignmentId: assignment.id,
+                assignmentName: sanitizedName(assignment.name),
+                courseName: sanitizedName(assignment.course?.name, fallback: "未命名课程"),
+                dueDate: dueDate,
+                pointsPossible: assignment.pointsPossible,
+                status: status
+            )
+        }
+    }
+
+    private func makeCourseSections(from items: [CanvasEventAssignmentItem]) -> [CanvasEventCourseSection] {
+        let groupedItems = Dictionary(grouping: items, by: \.courseName)
+
+        return groupedItems.map { courseName, items in
+            CanvasEventCourseSection(
+                courseName: courseName,
+                items: sortItems(items)
+            )
+        }
+        .sorted { lhs, rhs in
+            canvasCompareDates(
+                lhs.nextDueDate,
+                rhs.nextDueDate,
+                order: .ascending,
+                fallback: lhs.courseName.localizedStandardCompare(rhs.courseName) == .orderedAscending
+            )
+        }
+    }
+
+    private func sanitizedName(_ value: String?, fallback: String = "未命名待办事项") -> String {
+        let sanitized = (value ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return sanitized.isEmpty ? fallback : sanitized
+    }
+
+    private func latestSubmission(for assignment: Assignment) -> SubmissionNode? {
+        guard let nodes = assignment.submissionsConnection?.nodes else {
+            return nil
+        }
+
+        return nodes
+            .compactMap { $0 }
+            .max(by: { $0.attempt < $1.attempt })
+    }
+
+    private func sortItems(_ items: [CanvasEventAssignmentItem]) -> [CanvasEventAssignmentItem] {
+        items.sorted { lhs, rhs in
+            canvasCompareDates(
+                lhs.dueDate,
+                rhs.dueDate,
+                order: .ascending,
+                fallback: lhs.assignmentName.localizedStandardCompare(rhs.assignmentName) == .orderedAscending
+            )
+        }
+    }
+
+    @MainActor
+    private func loadAssignments(force: Bool = false) async {
+        guard !isLoading else {
+            return
+        }
+
+        if !force && !assignments.isEmpty {
+            return
+        }
+
+        hasLoadedOnce = true
+
+        guard let token = canvasToken else {
+            loadErrorMessage = "Canvas 令牌不可用，请在账户设置中重新启用。"
+            return
+        }
+
+        isLoading = true
+        loadErrorMessage = nil
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+            let api = CanvasAPI(token: token)
+            let events = try await api.getUpcomingEvents()
+            let assignmentIDs = events.compactMap { $0.assignment?.id }
+
+            guard !assignmentIDs.isEmpty else {
+                assignments = []
+                return
+            }
+
+            assignments = try await api.getAssignments(assignmentIds: assignmentIDs)
+        } catch ResponseCodeInterceptor.ResponseCodeError.invalidResponseCode {
+            loadErrorMessage = "Canvas 令牌可能已失效，请在账户设置中重新启用。"
+        } catch {
+            loadErrorMessage = "无法加载待办事项列表，请稍后重试。"
+        }
+    }
+}
+
+private struct CanvasEventAssignmentItem: Identifiable {
+    enum Status {
+        case overdue
+        case upcoming
+        case submitted
+        case graded(score: Double?, pointsPossible: Double?)
+        case unscheduled
+    }
+
+    let assignmentId: String
+    let assignmentName: String
+    let courseName: String
+    let dueDate: Date?
+    let pointsPossible: Double?
+    let status: Status
+
+    var id: String {
+        assignmentId
+    }
+}
+
+private struct CanvasEventCourseSection: Identifiable {
+    let courseName: String
+    let items: [CanvasEventAssignmentItem]
+
+    var id: String {
+        courseName
+    }
+
+    var nextDueDate: Date? {
+        items.compactMap(\.dueDate).min()
+    }
+
+    var subtitle: String {
+        if let nextDueDate {
+            return "\(items.count) 项 · 最早截止 \(nextDueDate.formattedCanvasRelativeDueDate())"
+        }
+
+        return "\(items.count) 项 · 暂无截止时间"
+    }
+}
+
+private struct CanvasCourseSectionHeader: View {
+    let section: CanvasEventCourseSection
+
+    var body: some View {
+        CanvasSectionHeader(
+            title: section.courseName,
+            subtitle: section.subtitle,
+            systemImage: "books.vertical.fill",
+            tint: .blue
+        )
+    }
+}
+
+private struct CanvasEventAssignmentRow: View {
+    let item: CanvasEventAssignmentItem
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(item.assignmentName)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                if !metadataItems.isEmpty {
+                    CanvasMetadataGroup(items: metadataItems)
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            CanvasStatusView(presentation: item.status.canvasStatusPresentation)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var metadataItems: [CanvasMetadataItem] {
+        var items: [CanvasMetadataItem] = []
+
+        items.append(
+            CanvasMetadataItem(
+                systemImage: dueSystemImage,
+                text: dueText
+            )
+        )
+
+        if let pointsPossible = item.pointsPossible, pointsPossible > 0 {
+            items.append(
+                CanvasMetadataItem(
+                    systemImage: "chart.bar.xaxis",
+                    text: "满分 \(pointsPossible.clean)"
+                )
+            )
+        }
+
+        return items
+    }
+
+    private var dueSystemImage: String {
+        switch item.status {
+        case .unscheduled:
+            "calendar.badge.questionmark"
+        case .overdue:
+            "clock"
+        default:
+            "calendar"
+        }
+    }
+
+    private var dueText: String {
+        guard let dueDate = item.dueDate else {
+            return "未设置截止时间"
+        }
+
+        switch item.status {
+        case .overdue:
+            return dueDate.formattedCanvasRelativeDueDate(includeOverduePrefix: true)
+        default:
+            return dueDate.formattedCanvasRelativeDueDate()
+        }
+    }
+}
+
+private extension CanvasEventAssignmentItem.Status {
+    var canvasStatusPresentation: CanvasStatusPresentation {
+        switch self {
+        case let .graded(score, pointsPossible):
+            CanvasStatusPresentation(
+                title: "已评分",
+                tint: .green,
+                score: score,
+                pointsPossible: pointsPossible
+            )
+        case .submitted:
+            CanvasStatusPresentation(title: "已提交", tint: .teal)
+        case .overdue:
+            CanvasStatusPresentation(title: "已逾期", tint: .orange)
+        case .upcoming:
+            CanvasStatusPresentation(title: "待完成", tint: .blue)
+        case .unscheduled:
+            CanvasStatusPresentation(title: "待查看", tint: .secondary)
+        }
     }
 }
 
 #Preview {
-    CanvasEventsView()
+    NavigationStack {
+        CanvasEventsView()
+    }
 }

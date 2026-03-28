@@ -5,5 +5,19 @@ import ApolloAPI
 
 extension CanvasSchema.Interfaces {
   /// An item that can be in context modules
-  static let ModuleItemInterface = ApolloAPI.Interface(name: "ModuleItemInterface")
+  static let ModuleItemInterface = ApolloAPI.Interface(
+    name: "ModuleItemInterface",
+    keyFields: nil,
+    implementingObjects: [
+      "Assignment",
+      "File",
+      "ExternalTool",
+      "Discussion",
+      "Page",
+      "Quiz",
+      "ExternalUrl",
+      "ModuleExternalTool",
+      "SubHeader"
+    ]
+  )
 }

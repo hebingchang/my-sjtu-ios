@@ -6,6 +6,7 @@ import ApolloAPI
 extension CanvasSchema.Objects {
   static let SubHeader = ApolloAPI.Object(
     typename: "SubHeader",
-    implementedInterfaces: [CanvasSchema.Interfaces.ModuleItemInterface.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.ModuleItemInterface.self],
+    keyFields: nil
   )
 }

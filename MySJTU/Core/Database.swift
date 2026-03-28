@@ -238,7 +238,7 @@ class Eloquent {
             let dbURL = FileManager.default
                 .containerURL(forSecurityApplicationGroupIdentifier: "group.com.boar.sjct")!
                 .appendingPathComponent("class_table.db")
-            
+                        
             Eloquent.pool = try openSharedDatabase(at: dbURL)
         } catch {
             throw error
@@ -448,7 +448,7 @@ class Eloquent {
         guard let connection = Eloquent.pool else {
             throw EloquentError.dbNotOpened
         }
-        
+
         try await connection.write { db in
             if deleteExisting {
                 try Schedule
@@ -468,23 +468,31 @@ class Eloquent {
                 }
             }
         }
+
+        Task { @MainActor in
+            Connectivity.shared.sendLatestScheduleSnapshot()
+        }
     }
-    
+
     static func deleteCustomSchedule(id: Int64) async throws {
         guard let connection = Eloquent.pool else {
             throw EloquentError.dbNotOpened
         }
-        
+
         _ = try await connection.write { db in
             try CustomSchedule.deleteOne(db, key: id)
         }
+
+        Task { @MainActor in
+            Connectivity.shared.sendLatestScheduleSnapshot()
+        }
     }
-    
+
     static func saveCustomSchedule(entry: CustomScheduleEntry) async throws {
         guard let connection = Eloquent.pool else {
             throw EloquentError.dbNotOpened
         }
-        
+
         var schedule = CustomSchedule(
             name: entry.name,
             description: entry.description,
@@ -514,6 +522,10 @@ class Eloquent {
         let scheduleToSave = schedule
         try await connection.write { db in
             try scheduleToSave.save(db)
+        }
+
+        Task { @MainActor in
+            Connectivity.shared.sendLatestScheduleSnapshot()
         }
     }
 }

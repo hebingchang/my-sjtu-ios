@@ -35,6 +35,11 @@ struct DataSourceView: View {
         }
     }
 
+    private func reloadComplicationsAndWatch() {
+        WidgetCenter.shared.reloadAllTimelines()
+        Connectivity.shared.sendLatestScheduleSnapshot()
+    }
+
     var body: some View {
         List {
             ForEach(categorizedColleges, id: \.category) { groupedCollege in
@@ -72,7 +77,10 @@ struct DataSourceView: View {
         .navigationTitle("数据源")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: collegeId) {
-            WidgetCenter.shared.reloadAllTimelines()
+            reloadComplicationsAndWatch()
+        }
+        .onChange(of: showBothCollege) {
+            reloadComplicationsAndWatch()
         }
     }
 }

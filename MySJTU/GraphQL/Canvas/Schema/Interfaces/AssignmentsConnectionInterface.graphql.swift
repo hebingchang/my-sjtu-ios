@@ -4,5 +4,12 @@
 import ApolloAPI
 
 extension CanvasSchema.Interfaces {
-  static let AssignmentsConnectionInterface = ApolloAPI.Interface(name: "AssignmentsConnectionInterface")
+  static let AssignmentsConnectionInterface = ApolloAPI.Interface(
+    name: "AssignmentsConnectionInterface",
+    keyFields: nil,
+    implementingObjects: [
+      "Course",
+      "AssignmentGroup"
+    ]
+  )
 }

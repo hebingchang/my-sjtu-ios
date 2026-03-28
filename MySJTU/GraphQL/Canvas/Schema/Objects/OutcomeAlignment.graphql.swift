@@ -9,6 +9,7 @@ extension CanvasSchema.Objects {
     implementedInterfaces: [
       CanvasSchema.Interfaces.Timestamped.self,
       CanvasSchema.Interfaces.LegacyIDInterface.self
-    ]
+    ],
+    keyFields: nil
   )
 }

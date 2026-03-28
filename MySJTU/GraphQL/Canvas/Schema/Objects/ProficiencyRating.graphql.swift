@@ -7,6 +7,7 @@ extension CanvasSchema.Objects {
   /// Customized proficiency rating
   static let ProficiencyRating = ApolloAPI.Object(
     typename: "ProficiencyRating",
-    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self],
+    keyFields: nil
   )
 }

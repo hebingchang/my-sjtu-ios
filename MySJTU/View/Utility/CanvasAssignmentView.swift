@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Apollo
 
 private let submissionTypeDescription: [CanvasSchema.SubmissionType?: String] = [
     .attendance: "出勤",
@@ -30,139 +31,165 @@ private let gradingStatusDescription: [CanvasSchema.SubmissionGradingStatus?: St
     .needsGrading: "等待评分",
     .needsReview: "等待审核",
 ]
-    
 
 struct CanvasAssignmentView: View {
-    var assignmentId: String
-    var assignmentName: String
-    private let dateFormatter = ISO8601DateFormatter()
+    private typealias Assignment = CanvasSchema.GetAssignmentDetailQuery.Data.Assignment
 
-    @State private var loading: Bool = true
-    @State private var assignment: CanvasSchema.GetAssignmentDetailQuery.Data.Assignment?
-    @State private var descriptionText: AttributedString?
-    @AppStorage("accounts") var accounts: [WebAuthAccount] = []
+    let assignmentId: String
+    let assignmentName: String
+
+    @AppStorage("accounts") private var accounts: [WebAuthAccount] = []
+    @State private var assignment: Assignment?
+    @State private var isLoading: Bool = true
+    @State private var loadErrorMessage: String?
+
+    private var canvasToken: String? {
+        accounts.jaccountCanvasToken
+    }
 
     var body: some View {
-        let account = accounts.first {
-            $0.provider == .jaccount
-        }
-
-        ZStack {
-            if loading {
-                VStack {
-                    ProgressView()
-                }
-                .task {
-                    do {
-                        if let account, account.enabledFeatures.contains(.canvas), let token = account.bizData["canvas_token"] {
-                            let api = CanvasAPI(token: token)
-                            self.assignment = try await api.getAssignmentDetail(assignmentId: assignmentId)
-                            
-                            DispatchQueue.main.async {
-                                if let description = self.assignment?.description {
-                                    if let data = description.data(using: .utf8) {
-                                        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
-                                            .documentType: NSAttributedString.DocumentType.html,
-                                            .characterEncoding: String.Encoding.utf8.rawValue
-                                        ]
-                                        if let syllabusBody = try? NSAttributedString(data: data, options: options, documentAttributes: nil) {
-                                            self.descriptionText = try? AttributedString(syllabusBody, including: \.uiKit)
-                                            self.descriptionText?.foregroundColor = UIColor.label
-                                            self.descriptionText?.font = UIFont.preferredFont(forTextStyle: .callout)
-                                        }
-                                    }
-                                }
-                                loading = false
+        Group {
+            if isLoading {
+                CanvasLoadingView(title: "正在加载作业详情")
+            } else if let loadErrorMessage {
+                ContentUnavailableView {
+                    Label("无法获取作业详情", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(loadErrorMessage)
+                } actions: {
+                    if canvasToken != nil {
+                        Button("重试") {
+                            Task {
+                                await loadAssignment(force: true)
                             }
                         }
-                    } catch {
-                        print(error)
-                        loading = false
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let assignment {
-                let dateFormatter = ISO8601DateFormatter()
-                
-                List {
-                    HStack {
-                        Text("截止日期")
-                        Spacer()
-                        Text(assignment.dueAt != nil ? dateFormatter.date(from: assignment.dueAt!)!.formatted() : "长期")
-                            .font(.callout)
-                            .foregroundStyle(Color(UIColor.secondaryLabel))
-                    }
-                    
-                    if let pointsPossible = assignment.pointsPossible {
-                        HStack {
-                            Text("满分")
-                            Spacer()
-                            Text("\(pointsPossible.clean)")
-                                .font(.callout)
-                                .foregroundStyle(Color(UIColor.secondaryLabel))
-                        }
-                    }
-                    
-                    if let submissionTypes = assignment.submissionTypes {
-                        HStack {
-                            Text("提交")
-                            Spacer()
-                            Text(submissionTypes.map { submissionTypeDescription[$0.value] ?? "未知 (\($0.rawValue))" }.joined(separator: "或"))
-                                .font(.callout)
-                                .foregroundStyle(Color(UIColor.secondaryLabel))
-                        }
-                    }
-                    
-                    if let submissions = assignment.submissionsConnection?.nodes, submissions.count > 0 {
-                        ForEach(submissions, id: \.self) { submission in
-                            if let submission {
-                                Section(header: Text("提交 #\(submission.attempt)")) {
-                                    if let createdAt = submission.createdAt {
-                                        HStack {
-                                            Text("提交时间")
-                                            Spacer()
-                                            Text("\(dateFormatter.date(from: createdAt)!.formatted())")
-                                                .font(.callout)
-                                                .foregroundStyle(Color(UIColor.secondaryLabel))
-                                            
-                                        }
-                                    }
-
-                                    if let gradingStatus = submission.gradingStatus {
-                                        HStack {
-                                            Text("评分状态")
-                                            Spacer()
-                                            Text("\(gradingStatusDescription[gradingStatus.value] ?? "未知 \(gradingStatus.rawValue)")")
-                                                .font(.callout)
-                                                .foregroundStyle(Color(UIColor.secondaryLabel))
-                                            
-                                        }
-                                    }
-                                    
-                                    if let score = submission.score {
-                                        HStack {
-                                            Text("评分")
-                                            Spacer()
-                                            Text("\(score.clean)")
-                                                .font(.callout)
-                                                .foregroundStyle(Color(UIColor.secondaryLabel))
-                                            
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    if let descriptionText {
-                        Section(header: Text("作业详情")) {
-                            Text(descriptionText)
-                        }
-                    }
-                }
+                CanvasAssignmentDetailContent(assignment: assignment)
+            } else {
+                ContentUnavailableView(
+                    "暂无作业详情",
+                    systemImage: "doc.text.magnifyingglass",
+                    description: Text("Canvas 没有返回更多作业信息。")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .navigationTitle(assignmentName)
         .navigationBarTitleDisplayMode(.inline)
-        .animation(.easeInOut, value: loading)
+        .animation(.easeInOut, value: isLoading)
+        .task(id: assignmentId) {
+            await loadAssignment()
+        }
+    }
+
+    @MainActor
+    private func loadAssignment(force: Bool = false) async {
+        if !force && assignment != nil {
+            return
+        }
+
+        guard let token = canvasToken else {
+            loadErrorMessage = "Canvas 令牌不可用，请在账户设置中重新启用。"
+            isLoading = false
+            return
+        }
+
+        isLoading = true
+        loadErrorMessage = nil
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+            let api = CanvasAPI(token: token)
+            assignment = try await api.getAssignmentDetail(assignmentId: assignmentId)
+        } catch ResponseCodeInterceptor.ResponseCodeError.invalidResponseCode {
+            loadErrorMessage = "Canvas 令牌可能已失效，请在账户设置中重新启用。"
+        } catch {
+            loadErrorMessage = "无法加载作业详情，请稍后重试。"
+        }
+    }
+}
+
+private struct CanvasAssignmentDetailContent: View {
+    typealias Assignment = CanvasSchema.GetAssignmentDetailQuery.Data.Assignment
+    typealias Submission = CanvasSchema.GetAssignmentDetailQuery.Data.Assignment.SubmissionsConnection.Node
+
+    let assignment: Assignment
+
+    private var submissionItems: [Submission] {
+        assignment.submissionsConnection?.nodes?.compactMap { $0 } ?? []
+    }
+
+    var body: some View {
+        List {
+            CanvasInfoRow(
+                title: "截止日期",
+                value: formattedDate(assignment.dueAt) ?? "长期"
+            )
+
+            if let pointsPossible = assignment.pointsPossible {
+                CanvasInfoRow(
+                    title: "满分",
+                    value: pointsPossible.clean
+                )
+            }
+
+            if let submissionTypes = assignment.submissionTypes, !submissionTypes.isEmpty {
+                CanvasInfoRow(
+                    title: "提交",
+                    value: submissionTypes
+                        .map { submissionTypeDescription[$0.value] ?? "未知 (\($0.rawValue))" }
+                        .joined(separator: "或"),
+                    multiline: true
+                )
+            }
+
+            ForEach(submissionItems, id: \.self) { submission in
+                Section(header: Text("提交 #\(submission.attempt)")) {
+                    if let createdAt = submission.createdAt {
+                        CanvasInfoRow(
+                            title: "提交时间",
+                            value: formattedDate(createdAt) ?? createdAt
+                        )
+                    }
+
+                    if let gradingStatus = submission.gradingStatus {
+                        CanvasInfoRow(
+                            title: "评分状态",
+                            value: gradingStatusDescription[gradingStatus.value] ?? "未知 \(gradingStatus.rawValue)"
+                        )
+                    }
+
+                    if let score = submission.score {
+                        CanvasInfoRow(
+                            title: "评分",
+                            value: score.clean
+                        )
+                    }
+                }
+            }
+
+            if let description = assignment.description,
+               !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Section(header: Text("作业详情")) {
+                    HTMLTextView(htmlContent: description)
+                }
+            }
+        }
+    }
+
+    private func formattedDate(_ value: String?) -> String? {
+        guard let value,
+              let date = CanvasFormatters.iso8601.date(from: value)
+        else {
+            return nil
+        }
+
+        return date.formatted()
     }
 }

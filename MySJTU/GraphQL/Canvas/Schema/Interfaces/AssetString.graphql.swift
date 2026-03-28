@@ -4,5 +4,13 @@
 import ApolloAPI
 
 extension CanvasSchema.Interfaces {
-  static let AssetString = ApolloAPI.Interface(name: "AssetString")
+  static let AssetString = ApolloAPI.Interface(
+    name: "AssetString",
+    keyFields: nil,
+    implementingObjects: [
+      "Course",
+      "Enrollment",
+      "Group"
+    ]
+  )
 }

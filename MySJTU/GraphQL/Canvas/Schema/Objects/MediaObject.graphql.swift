@@ -6,6 +6,7 @@ import ApolloAPI
 extension CanvasSchema.Objects {
   static let MediaObject = ApolloAPI.Object(
     typename: "MediaObject",
-    implementedInterfaces: [CanvasSchema.Interfaces.Node.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.Node.self],
+    keyFields: nil
   )
 }

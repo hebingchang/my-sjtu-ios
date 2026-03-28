@@ -352,7 +352,7 @@ struct BusLineDetailSheetContent: View {
             comingSchedules: comingSchedules,
             comingScheduleIDs: comingSchedules.map(\.id),
             scheduleTimeTextByIndex: scheduleTimeTextByIndex(
-                activeSchedule: activeSchedule,
+                activeSchedule: comingSchedules.isEmpty ? nil : activeSchedule,
                 selectedDisplayedStationIndex: selectedDisplayedStationIndex,
                 displayedStations: displayedStations
             )

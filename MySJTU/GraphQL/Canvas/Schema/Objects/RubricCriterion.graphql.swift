@@ -7,6 +7,7 @@ extension CanvasSchema.Objects {
   /// Individual criteria for a rubric
   static let RubricCriterion = ApolloAPI.Object(
     typename: "RubricCriterion",
-    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self],
+    keyFields: nil
   )
 }

@@ -1180,7 +1180,7 @@ struct JointOpenAPI {
             let classId = try resolvedClassId(for: first)
             let organization = resolvedOrganization(for: first, detail: detail)
             let courseCode = first.courseCode.trimSpace()
-            let classCode = first.lessonClassCode.trimSpace()
+            let classCode = detail?.code ?? first.lessonClassCode.trimSpace()
             let className = first.lessonClassName.trimSpace()
             let resolvedCourseCode = !courseCode.isEmpty ? courseCode : (classCode.isEmpty ? classId : classCode)
             let teachers = Array(Set(lessons.flatMap { lesson in
@@ -1772,7 +1772,7 @@ struct CanvasAPI {
     
     struct Event: Codable {
         let title: String
-        let description: String
+        let description: String?
         let type: String
         let assignment: Assignment?
     }

@@ -27,6 +27,9 @@ extension CanvasSchema {
       static var __selections: [ApolloAPI.Selection] { [
         .field("assignment", Assignment?.self, arguments: ["id": .variable("assignmentId")]),
       ] }
+      static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        GetAssignmentDetailQuery.Data.self
+      ] }
 
       var assignment: Assignment? { __data["assignment"] }
 
@@ -50,6 +53,9 @@ extension CanvasSchema {
           .field("submissionTypes", [GraphQLEnum<CanvasSchema.SubmissionType>]?.self),
           .field("allowedExtensions", [String]?.self),
           .field("submissionsConnection", SubmissionsConnection?.self),
+        ] }
+        static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          GetAssignmentDetailQuery.Data.Assignment.self
         ] }
 
         var course: Course? { __data["course"] }
@@ -80,6 +86,9 @@ extension CanvasSchema {
             .field("id", CanvasSchema.ID.self),
             .field("name", String.self),
           ] }
+          static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            GetAssignmentDetailQuery.Data.Assignment.Course.self
+          ] }
 
           var id: CanvasSchema.ID { __data["id"] }
           var name: String { __data["name"] }
@@ -96,6 +105,9 @@ extension CanvasSchema {
           static var __selections: [ApolloAPI.Selection] { [
             .field("__typename", String.self),
             .field("nodes", [Node?]?.self),
+          ] }
+          static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            GetAssignmentDetailQuery.Data.Assignment.SubmissionsConnection.self
           ] }
 
           /// A list of nodes.
@@ -117,6 +129,9 @@ extension CanvasSchema {
               .field("score", Double?.self),
               .field("gradingStatus", GraphQLEnum<CanvasSchema.SubmissionGradingStatus>?.self),
               .field("createdAt", CanvasSchema.DateTime?.self),
+            ] }
+            static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+              GetAssignmentDetailQuery.Data.Assignment.SubmissionsConnection.Node.self
             ] }
 
             var id: CanvasSchema.ID { __data["id"] }

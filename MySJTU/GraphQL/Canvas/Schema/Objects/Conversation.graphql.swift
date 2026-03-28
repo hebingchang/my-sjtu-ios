@@ -6,6 +6,7 @@ import ApolloAPI
 extension CanvasSchema.Objects {
   static let Conversation = ApolloAPI.Object(
     typename: "Conversation",
-    implementedInterfaces: [CanvasSchema.Interfaces.Node.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.Node.self],
+    keyFields: nil
   )
 }

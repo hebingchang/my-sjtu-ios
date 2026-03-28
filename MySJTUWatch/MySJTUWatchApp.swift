@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct MySJTUWatch_Watch_AppApp: App {
+    @StateObject private var store = WatchScheduleStore()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(store)
         }
     }
 }

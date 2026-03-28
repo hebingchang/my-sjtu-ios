@@ -12,6 +12,7 @@ extension CanvasSchema.Objects {
       CanvasSchema.Interfaces.Timestamped.self,
       CanvasSchema.Interfaces.LegacyIDInterface.self,
       CanvasSchema.Interfaces.AssignmentsConnectionInterface.self
-    ]
+    ],
+    keyFields: nil
   )
 }

@@ -40,6 +40,16 @@ struct ProfileView: View {
                         } label: {
                             Label("个性化", systemImage: "paintpalette")
                         }
+
+                        if let account = (accounts.first {
+                            $0.provider == .jaccount
+                        }), account.enabledFeatures.contains(.canvas), account.bizData["canvas_token"] != nil {
+                            NavigationLink {
+                                CanvasSettingsView()
+                            } label: {
+                                Label("Canvas 设置", systemImage: "link.circle")
+                            }
+                        }
                     }
                 }
                 
@@ -50,7 +60,7 @@ struct ProfileView: View {
                         NavigationLink {
                             CanvasEventsView()
                         } label: {
-                            Label("作业", systemImage: "book.pages")
+                            Label("Canvas 待办事项", systemImage: "book.pages")
                         }
                     }
                     

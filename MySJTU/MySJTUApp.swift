@@ -10,6 +10,7 @@ import WidgetKit
 
 @main
 struct MySJTUApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject var progressor: Progressor = Progressor()
     @StateObject var appConfig: AppConfig = AppConfig(appStatus: .normal)
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -26,7 +27,9 @@ struct MySJTUApp: App {
         } catch {
             print(error)
         }
-        
+
+        _ = Connectivity.shared
+
         Task {
             let rawAccounts = UserDefaults.standard.string(forKey: "accounts")
             if let rawAccounts {
@@ -55,6 +58,14 @@ struct MySJTUApp: App {
                 .overlay {
                     ProgressOverlay(isShowingProgress: progressor.isShowingProgress, progress: progressor.progress)
                         .animation(.easeInOut, value: progressor.isShowingProgress)
+                }
+                .task {
+                    Connectivity.shared.sendLatestScheduleSnapshot()
+                }
+                .onChange(of: scenePhase) {
+                    if scenePhase == .active {
+                        Connectivity.shared.sendLatestScheduleSnapshot()
+                    }
                 }
                 .onChange(of: networkMonitor.isConnected) {
                     if networkMonitor.isConnected {                        

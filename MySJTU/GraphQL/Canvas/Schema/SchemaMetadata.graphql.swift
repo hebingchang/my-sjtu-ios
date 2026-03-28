@@ -27,68 +27,69 @@ extension CanvasSchema {
   enum SchemaMetadata: ApolloAPI.SchemaMetadata {
     static let configuration: any ApolloAPI.SchemaConfiguration.Type = SchemaConfiguration.self
 
+    private static let objectTypeMap: [String: ApolloAPI.Object] = [
+      "Account": CanvasSchema.Objects.Account,
+      "AssessmentRequest": CanvasSchema.Objects.AssessmentRequest,
+      "Assignment": CanvasSchema.Objects.Assignment,
+      "AssignmentConnection": CanvasSchema.Objects.AssignmentConnection,
+      "AssignmentGroup": CanvasSchema.Objects.AssignmentGroup,
+      "AssignmentOverride": CanvasSchema.Objects.AssignmentOverride,
+      "CommentBankItem": CanvasSchema.Objects.CommentBankItem,
+      "CommunicationChannel": CanvasSchema.Objects.CommunicationChannel,
+      "ContentTag": CanvasSchema.Objects.ContentTag,
+      "Conversation": CanvasSchema.Objects.Conversation,
+      "Course": CanvasSchema.Objects.Course,
+      "Discussion": CanvasSchema.Objects.Discussion,
+      "DiscussionEntry": CanvasSchema.Objects.DiscussionEntry,
+      "DiscussionEntryDraft": CanvasSchema.Objects.DiscussionEntryDraft,
+      "Enrollment": CanvasSchema.Objects.Enrollment,
+      "ExternalTool": CanvasSchema.Objects.ExternalTool,
+      "ExternalUrl": CanvasSchema.Objects.ExternalUrl,
+      "File": CanvasSchema.Objects.File,
+      "GradingPeriod": CanvasSchema.Objects.GradingPeriod,
+      "Group": CanvasSchema.Objects.Group,
+      "GroupMembership": CanvasSchema.Objects.GroupMembership,
+      "GroupSet": CanvasSchema.Objects.GroupSet,
+      "InternalSetting": CanvasSchema.Objects.InternalSetting,
+      "LearningOutcome": CanvasSchema.Objects.LearningOutcome,
+      "LearningOutcomeGroup": CanvasSchema.Objects.LearningOutcomeGroup,
+      "MediaObject": CanvasSchema.Objects.MediaObject,
+      "MediaTrack": CanvasSchema.Objects.MediaTrack,
+      "MessageableContext": CanvasSchema.Objects.MessageableContext,
+      "MessageableUser": CanvasSchema.Objects.MessageableUser,
+      "Module": CanvasSchema.Objects.Module,
+      "ModuleExternalTool": CanvasSchema.Objects.ModuleExternalTool,
+      "ModuleItem": CanvasSchema.Objects.ModuleItem,
+      "Notification": CanvasSchema.Objects.Notification,
+      "NotificationPolicy": CanvasSchema.Objects.NotificationPolicy,
+      "OutcomeAlignment": CanvasSchema.Objects.OutcomeAlignment,
+      "OutcomeCalculationMethod": CanvasSchema.Objects.OutcomeCalculationMethod,
+      "OutcomeFriendlyDescriptionType": CanvasSchema.Objects.OutcomeFriendlyDescriptionType,
+      "OutcomeProficiency": CanvasSchema.Objects.OutcomeProficiency,
+      "Page": CanvasSchema.Objects.Page,
+      "PostPolicy": CanvasSchema.Objects.PostPolicy,
+      "ProficiencyRating": CanvasSchema.Objects.ProficiencyRating,
+      "Progress": CanvasSchema.Objects.Progress,
+      "Query": CanvasSchema.Objects.Query,
+      "Quiz": CanvasSchema.Objects.Quiz,
+      "Rubric": CanvasSchema.Objects.Rubric,
+      "RubricAssessment": CanvasSchema.Objects.RubricAssessment,
+      "RubricAssociation": CanvasSchema.Objects.RubricAssociation,
+      "RubricCriterion": CanvasSchema.Objects.RubricCriterion,
+      "RubricRating": CanvasSchema.Objects.RubricRating,
+      "Section": CanvasSchema.Objects.Section,
+      "SubHeader": CanvasSchema.Objects.SubHeader,
+      "Submission": CanvasSchema.Objects.Submission,
+      "SubmissionComment": CanvasSchema.Objects.SubmissionComment,
+      "SubmissionConnection": CanvasSchema.Objects.SubmissionConnection,
+      "SubmissionDraft": CanvasSchema.Objects.SubmissionDraft,
+      "SubmissionHistory": CanvasSchema.Objects.SubmissionHistory,
+      "Term": CanvasSchema.Objects.Term,
+      "User": CanvasSchema.Objects.User
+    ]
+
     static func objectType(forTypename typename: String) -> ApolloAPI.Object? {
-      switch typename {
-      case "Account": return CanvasSchema.Objects.Account
-      case "AssessmentRequest": return CanvasSchema.Objects.AssessmentRequest
-      case "Assignment": return CanvasSchema.Objects.Assignment
-      case "AssignmentConnection": return CanvasSchema.Objects.AssignmentConnection
-      case "AssignmentGroup": return CanvasSchema.Objects.AssignmentGroup
-      case "AssignmentOverride": return CanvasSchema.Objects.AssignmentOverride
-      case "CommentBankItem": return CanvasSchema.Objects.CommentBankItem
-      case "CommunicationChannel": return CanvasSchema.Objects.CommunicationChannel
-      case "ContentTag": return CanvasSchema.Objects.ContentTag
-      case "Conversation": return CanvasSchema.Objects.Conversation
-      case "Course": return CanvasSchema.Objects.Course
-      case "Discussion": return CanvasSchema.Objects.Discussion
-      case "DiscussionEntry": return CanvasSchema.Objects.DiscussionEntry
-      case "DiscussionEntryDraft": return CanvasSchema.Objects.DiscussionEntryDraft
-      case "Enrollment": return CanvasSchema.Objects.Enrollment
-      case "ExternalTool": return CanvasSchema.Objects.ExternalTool
-      case "ExternalUrl": return CanvasSchema.Objects.ExternalUrl
-      case "File": return CanvasSchema.Objects.File
-      case "GradingPeriod": return CanvasSchema.Objects.GradingPeriod
-      case "Group": return CanvasSchema.Objects.Group
-      case "GroupMembership": return CanvasSchema.Objects.GroupMembership
-      case "GroupSet": return CanvasSchema.Objects.GroupSet
-      case "InternalSetting": return CanvasSchema.Objects.InternalSetting
-      case "LearningOutcome": return CanvasSchema.Objects.LearningOutcome
-      case "LearningOutcomeGroup": return CanvasSchema.Objects.LearningOutcomeGroup
-      case "MediaObject": return CanvasSchema.Objects.MediaObject
-      case "MediaTrack": return CanvasSchema.Objects.MediaTrack
-      case "MessageableContext": return CanvasSchema.Objects.MessageableContext
-      case "MessageableUser": return CanvasSchema.Objects.MessageableUser
-      case "Module": return CanvasSchema.Objects.Module
-      case "ModuleExternalTool": return CanvasSchema.Objects.ModuleExternalTool
-      case "ModuleItem": return CanvasSchema.Objects.ModuleItem
-      case "Notification": return CanvasSchema.Objects.Notification
-      case "NotificationPolicy": return CanvasSchema.Objects.NotificationPolicy
-      case "OutcomeAlignment": return CanvasSchema.Objects.OutcomeAlignment
-      case "OutcomeCalculationMethod": return CanvasSchema.Objects.OutcomeCalculationMethod
-      case "OutcomeFriendlyDescriptionType": return CanvasSchema.Objects.OutcomeFriendlyDescriptionType
-      case "OutcomeProficiency": return CanvasSchema.Objects.OutcomeProficiency
-      case "Page": return CanvasSchema.Objects.Page
-      case "PostPolicy": return CanvasSchema.Objects.PostPolicy
-      case "ProficiencyRating": return CanvasSchema.Objects.ProficiencyRating
-      case "Progress": return CanvasSchema.Objects.Progress
-      case "Query": return CanvasSchema.Objects.Query
-      case "Quiz": return CanvasSchema.Objects.Quiz
-      case "Rubric": return CanvasSchema.Objects.Rubric
-      case "RubricAssessment": return CanvasSchema.Objects.RubricAssessment
-      case "RubricAssociation": return CanvasSchema.Objects.RubricAssociation
-      case "RubricCriterion": return CanvasSchema.Objects.RubricCriterion
-      case "RubricRating": return CanvasSchema.Objects.RubricRating
-      case "Section": return CanvasSchema.Objects.Section
-      case "SubHeader": return CanvasSchema.Objects.SubHeader
-      case "Submission": return CanvasSchema.Objects.Submission
-      case "SubmissionComment": return CanvasSchema.Objects.SubmissionComment
-      case "SubmissionConnection": return CanvasSchema.Objects.SubmissionConnection
-      case "SubmissionDraft": return CanvasSchema.Objects.SubmissionDraft
-      case "SubmissionHistory": return CanvasSchema.Objects.SubmissionHistory
-      case "Term": return CanvasSchema.Objects.Term
-      case "User": return CanvasSchema.Objects.User
-      default: return nil
-      }
+      objectTypeMap[typename]
     }
   }
 

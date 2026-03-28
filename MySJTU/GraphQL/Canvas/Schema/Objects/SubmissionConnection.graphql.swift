@@ -7,6 +7,7 @@ extension CanvasSchema.Objects {
   /// The connection type for Submission.
   static let SubmissionConnection = ApolloAPI.Object(
     typename: "SubmissionConnection",
-    implementedInterfaces: []
+    implementedInterfaces: [],
+    keyFields: nil
   )
 }

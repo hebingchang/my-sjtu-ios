@@ -7,6 +7,7 @@ extension CanvasSchema.Objects {
   /// Possible rating for a rubric criterion
   static let RubricRating = ApolloAPI.Object(
     typename: "RubricRating",
-    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self]
+    implementedInterfaces: [CanvasSchema.Interfaces.LegacyIDInterface.self],
+    keyFields: nil
   )
 }
