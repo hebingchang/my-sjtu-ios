@@ -29,6 +29,10 @@
 	<array>
 		<string>ChillRoundGothic_Bold.otf</string>
 	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>

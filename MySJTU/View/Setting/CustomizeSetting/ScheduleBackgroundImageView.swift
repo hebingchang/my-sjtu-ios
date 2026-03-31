@@ -32,8 +32,16 @@ struct ScheduleBackgroundImageView: View {
     @State private var showImagePicker = false
     @State private var pickedBackgroundImage: UIImage?
     @State private var errorMessage: String?
+    @State private var contextScreen: UIScreen?
 
     private let previewCornerRadius: CGFloat = 28
+    private let fallbackViewportSize = CGSize(width: 390, height: 844)
+
+    private var viewportSize: CGSize {
+        let bounds = contextScreen?.bounds ?? CGRect(origin: .zero, size: fallbackViewportSize)
+        guard bounds.width > 0, bounds.height > 0 else { return fallbackViewportSize }
+        return bounds.size
+    }
 
     private var previewImage: UIImage? {
         guard let backgroundImage else { return nil }
@@ -42,19 +50,22 @@ struct ScheduleBackgroundImageView: View {
 
     private var previewAspectRatio: CGFloat {
         guard let previewImage else {
-            return ScheduleBackgroundEffectConfiguration.maximumBackgroundAspectRatio
+            return ScheduleBackgroundEffectConfiguration.maximumBackgroundAspectRatio(for: viewportSize)
         }
-        return ScheduleBackgroundEffectConfiguration.constrainedBackgroundAspectRatio(for: previewImage.size)
+        return ScheduleBackgroundEffectConfiguration.constrainedBackgroundAspectRatio(
+            for: previewImage.size,
+            viewportSize: viewportSize
+        )
     }
 
     private var backgroundCropHeight: CGFloat {
-        min(UIScreen.main.bounds.height * 0.62, 520)
+        min(viewportSize.height * 0.62, 520)
     }
 
     private var backgroundCropAspectRatio: CGFloat {
         backgroundImageParallaxEnabled
-        ? ScheduleBackgroundEffectConfiguration.parallaxBackgroundAspectRatio
-        : ScheduleBackgroundEffectConfiguration.maximumBackgroundAspectRatio
+        ? ScheduleBackgroundEffectConfiguration.parallaxBackgroundAspectRatio(for: viewportSize)
+        : ScheduleBackgroundEffectConfiguration.maximumBackgroundAspectRatio(for: viewportSize)
     }
 
     private var backgroundCropSize: CGSize {
@@ -223,6 +234,9 @@ struct ScheduleBackgroundImageView: View {
             guard let newImage else { return }
             replaceBackgroundImage(with: newImage, parallaxEnabled: backgroundImageParallaxEnabled)
             pickedBackgroundImage = nil
+        }
+        .onContextScreenChange { screen in
+            contextScreen = screen
         }
     }
 
@@ -532,6 +546,12 @@ private enum WidgetBackgroundStorage {
 
 private extension WidgetBackgroundSlot {
     static let listIndicatorContainerWidth: CGFloat = 52
+    private static let defaultViewportSize = CGSize(width: 390, height: 844)
+
+    private static func resolvedViewportSize(_ viewportSize: CGSize) -> CGSize {
+        guard viewportSize.width > 0, viewportSize.height > 0 else { return defaultViewportSize }
+        return viewportSize
+    }
 
     var previewDesignSize: CGSize {
         switch self {
@@ -559,10 +579,11 @@ private extension WidgetBackgroundSlot {
         CGSize(width: listIndicatorWidth, height: listIndicatorWidth / aspectRatio)
     }
 
-    private static var editorPreviewScale: CGFloat {
+    private static func editorPreviewScale(in viewportSize: CGSize) -> CGFloat {
+        let viewportSize = resolvedViewportSize(viewportSize)
         let largestWidgetSize = systemLarge.previewDesignSize
-        let maxPreviewWidth = min(UIScreen.main.bounds.width - 36, 340)
-        let maxPreviewHeight = min(UIScreen.main.bounds.height * 0.42, 360)
+        let maxPreviewWidth = min(viewportSize.width - 36, 340)
+        let maxPreviewHeight = min(viewportSize.height * 0.42, 360)
 
         return min(
             maxPreviewWidth / largestWidgetSize.width,
@@ -570,15 +591,17 @@ private extension WidgetBackgroundSlot {
         )
     }
 
-    var editorPreviewSize: CGSize {
-        CGSize(
-            width: previewDesignSize.width * Self.editorPreviewScale,
-            height: previewDesignSize.height * Self.editorPreviewScale
+    func editorPreviewSize(in viewportSize: CGSize) -> CGSize {
+        let previewScale = Self.editorPreviewScale(in: viewportSize)
+        return CGSize(
+            width: previewDesignSize.width * previewScale,
+            height: previewDesignSize.height * previewScale
         )
     }
 
-    var cropSize: CGSize {
-        let screenWidth = UIScreen.main.bounds.width
+    func cropSize(in viewportSize: CGSize) -> CGSize {
+        let viewportSize = Self.resolvedViewportSize(viewportSize)
+        let screenWidth = viewportSize.width
 
         switch self {
         case .systemSmall:
@@ -588,7 +611,7 @@ private extension WidgetBackgroundSlot {
             let width = min(screenWidth - 36, 340)
             return CGSize(width: width, height: width / aspectRatio)
         case .systemLarge:
-            let height = min(UIScreen.main.bounds.height * 0.42, 340)
+            let height = min(viewportSize.height * 0.42, 340)
             return CGSize(width: height * aspectRatio, height: height)
         }
     }
@@ -744,6 +767,7 @@ private struct WidgetBackgroundSlotEditorView: View {
     @State private var pickedImage: UIImage?
     @State private var errorMessage: String?
     @State private var reloadTimelinesTask: Task<Void, Never>?
+    @State private var contextScreen: UIScreen?
 
     init(slot: WidgetBackgroundSlot) {
         self.slot = slot
@@ -766,6 +790,13 @@ private struct WidgetBackgroundSlotEditorView: View {
 
     private var previewImage: UIImage? {
         WidgetBackgroundStorage.image(for: storedFilename)
+    }
+
+    private var viewportSize: CGSize {
+        let fallbackSize = CGSize(width: 390, height: 844)
+        let bounds = contextScreen?.bounds ?? CGRect(origin: .zero, size: fallbackSize)
+        guard bounds.width > 0, bounds.height > 0 else { return fallbackSize }
+        return bounds.size
     }
 
     private var backgroundEffect: WidgetBackgroundEffectConfiguration {
@@ -856,7 +887,7 @@ private struct WidgetBackgroundSlotEditorView: View {
                         slot: slot,
                         image: previewImage,
                         effect: backgroundEffect,
-                        size: slot.editorPreviewSize
+                        size: slot.editorPreviewSize(in: viewportSize)
                     )
                     .frame(maxWidth: .infinity)
                     .contentShape(Rectangle())
@@ -955,7 +986,7 @@ private struct WidgetBackgroundSlotEditorView: View {
         }
         .cropImagePicker(
             cropType: .roundedRectangle(
-                size: slot.cropSize,
+                size: slot.cropSize(in: viewportSize),
                 cornerRadius: slot.cornerRadius,
                 style: .continuous
             ),
@@ -972,6 +1003,9 @@ private struct WidgetBackgroundSlotEditorView: View {
         }
         .onChange(of: backgroundBlurRadius) { _, _ in
             scheduleDebouncedWidgetReload()
+        }
+        .onContextScreenChange { screen in
+            contextScreen = screen
         }
     }
 

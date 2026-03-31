@@ -12,6 +12,7 @@
 		5A7A25CD2CE09560003F677F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25CC2CE09560003F677F /* Lottie */; };
 		5A7A25D32CE0D795003F677F /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25D22CE0D795003F677F /* Alamofire */; };
 		5A7A25DC2CE3212E003F677F /* QRCode in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25DB2CE3212E003F677F /* QRCode */; };
+		5A7BA26A2F7A581700690E11 /* VLCKitSPM in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7BA2692F7A581700690E11 /* VLCKitSPM */; };
 		5A7C9F0B2F768E9900B510A7 /* MySJTUWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5A7C9F012F768E9800B510A7 /* MySJTUWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5A7D7FBB2CF490C7001C6B90 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9F0FBB2CF3596F001A91B1 /* WidgetKit.framework */; };
 		5A7D7FBC2CF490C7001C6B90 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9F0FBD2CF3596F001A91B1 /* SwiftUI.framework */; };
@@ -198,6 +199,7 @@
 				5ADC4A922CDA01BD00EECE31 /* GRDB in Frameworks */,
 				5A7A25CD2CE09560003F677F /* Lottie in Frameworks */,
 				5A9F0F0A2CF1C383001A91B1 /* Apollo in Frameworks */,
+				5A7BA26A2F7A581700690E11 /* VLCKitSPM in Frameworks */,
 				5ABA499C2CEE5F5D00EDDC75 /* SwiftSoup in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -338,6 +340,7 @@
 				5A9F0F092CF1C383001A91B1 /* Apollo */,
 				5A65AB2D2D0C698700AE5000 /* FeedKit */,
 				5A65AB342D0C74F500AE5000 /* Collections */,
+				5A7BA2692F7A581700690E11 /* VLCKitSPM */,
 			);
 			productName = MySJTU;
 			productReference = 5AE57A552CA8013700A42DE6 /* MySJTU.app */;
@@ -441,6 +444,7 @@
 				5A9F0F082CF1C383001A91B1 /* XCRemoteSwiftPackageReference "apollo-ios" */,
 				5A65AB2C2D0C698700AE5000 /* XCRemoteSwiftPackageReference "FeedKit" */,
 				5A65AB332D0C74F500AE5000 /* XCRemoteSwiftPackageReference "swift-collections" */,
+				5A7BA2682F7A581700690E11 /* XCRemoteSwiftPackageReference "vlckit-spm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5AE57A562CA8013700A42DE6 /* Products */;
@@ -565,12 +569,12 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "";
+				CURRENT_PROJECT_VERSION = 141;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "交课表";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.boar.sjct;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -600,12 +604,12 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "";
+				CURRENT_PROJECT_VERSION = 141;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "交课表";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.boar.sjct;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -636,7 +640,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTUWidget/MySJTUWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 139;
+				CURRENT_PROJECT_VERSION = 141;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -676,7 +680,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTUWidget/MySJTUWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 139;
+				CURRENT_PROJECT_VERSION = 141;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -742,7 +746,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 140;
+				CURRENT_PROJECT_VERSION = 141;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -807,7 +811,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 140;
+				CURRENT_PROJECT_VERSION = 141;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -838,7 +842,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTU/MySJTU.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "";
+				CURRENT_PROJECT_VERSION = 141;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MySJTU/Preview Content\"";
 				DEVELOPMENT_TEAM = HK6N26354D;
@@ -862,7 +866,7 @@
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
@@ -894,7 +898,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTU/MySJTU.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "";
+				CURRENT_PROJECT_VERSION = 141;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MySJTU/Preview Content\"";
 				DEVELOPMENT_TEAM = HK6N26354D;
@@ -918,7 +922,7 @@
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
@@ -943,7 +947,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 139;
+				CURRENT_PROJECT_VERSION = 141;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -967,7 +971,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 139;
+				CURRENT_PROJECT_VERSION = 141;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -990,7 +994,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 139;
+				CURRENT_PROJECT_VERSION = 141;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1013,7 +1017,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 139;
+				CURRENT_PROJECT_VERSION = 141;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = HK6N26354D;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1132,6 +1136,14 @@
 				minimumVersion = 23.0.0;
 			};
 		};
+		5A7BA2682F7A581700690E11 /* XCRemoteSwiftPackageReference "vlckit-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tylerjonesio/vlckit-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.6.0;
+			};
+		};
 		5A9F0F082CF1C383001A91B1 /* XCRemoteSwiftPackageReference "apollo-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apollographql/apollo-ios.git";
@@ -1215,6 +1227,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5A7A25DA2CE3212E003F677F /* XCRemoteSwiftPackageReference "qrcode" */;
 			productName = QRCode;
+		};
+		5A7BA2692F7A581700690E11 /* VLCKitSPM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A7BA2682F7A581700690E11 /* XCRemoteSwiftPackageReference "vlckit-spm" */;
+			productName = VLCKitSPM;
 		};
 		5A7D7FD02CF4B334001C6B90 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;

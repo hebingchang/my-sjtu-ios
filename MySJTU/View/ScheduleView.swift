@@ -464,10 +464,6 @@ struct WeekTabView: View {
 
     private let windowRadius = Self.initialWindowRadius
 
-    private var pageWidth: CGFloat {
-        UIScreen.main.bounds.width - (displayMode == .week ? weekModeLeading : 0)
-    }
-
     init(selectedDay: Binding<Date>, baseDay: Date, displayMode: DisplayMode) {
         self._selectedDay = selectedDay
         self.baseDay = baseDay
@@ -510,7 +506,7 @@ struct WeekTabView: View {
                 ForEach(data, id: \.self) { offset in
                     let week = baseDay.addWeeks(offset)
                     WeekView(selectedDay: $selectedDay, week: week, displayMode: displayMode)
-                        .frame(width: pageWidth)
+                        .containerRelativeFrame(.horizontal)
                         .scrollTransition { content, phase in
                             content
                                 .scaleEffect(phase.isIdentity ? 1 : 0.99)
@@ -575,6 +571,7 @@ struct DayView: View {
     @Environment(\.colorScheme) var colorScheme: ColorScheme
     @AppStorage("schedule.backgroundImage") private var backgroundImage: URL?
     @State private var nowPosition: CGFloat?
+    @State private var expandedOverlapGroupID: String?
     // Minute-level refresh is enough for the current-time indicator.
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
@@ -600,6 +597,32 @@ struct DayView: View {
         static let eventCardVerticalPadding: CGFloat = 10
         static let eventCardCompactVerticalPadding: CGFloat = 8
         static let eventCardCompactThreshold: CGFloat = 60
+        static let overlapStackSpacingRatio: CGFloat = 0.022
+        static let overlapDimmedOpacity: Double = 0.9
+        static let overlapAnimation: Animation = .spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.12)
+    }
+
+    private struct TimedEventDescriptor {
+        let id: String
+        let start: CGFloat
+        let end: CGFloat
+    }
+
+    private struct DayEventOverlapLayout {
+        let groupID: String?
+        let orderIndex: Int
+        let groupSize: Int
+        let expandedCenter: CGFloat
+
+        var isOverlapping: Bool {
+            groupID != nil
+        }
+    }
+
+    private struct EventCardPlacement {
+        let yPosition: CGFloat
+        let isSeparated: Bool
+        let isDimmed: Bool
     }
 
     private var hasCustomBackgroundImage: Bool {
@@ -608,6 +631,11 @@ struct DayView: View {
 
     private var hourGridDividerColor: Color {
         scheduleGridDividerColor(hasCustomBackgroundImage: hasCustomBackgroundImage)
+    }
+
+    private var overlapLayoutsByEventID: [String: DayEventOverlapLayout] {
+        let timedEvents = schedules.map(scheduleDescriptor) + customSchedules.map(customScheduleDescriptor)
+        return computeOverlapLayouts(for: timedEvents)
     }
 
     private struct HourAxisView: View {
@@ -659,6 +687,10 @@ struct DayView: View {
     private struct EventCardSurfaceView<Content: View>: View {
         let colorHex: String
         let colorScheme: ColorScheme
+        let overlapLayout: DayEventOverlapLayout?
+        var isSeparated: Bool = false
+        var isFocused: Bool = false
+        var isDimmed: Bool = false
         @ViewBuilder let content: () -> Content
 
         private var backgroundColor: Color {
@@ -667,44 +699,149 @@ struct DayView: View {
             : Color(UIColor.secondarySystemBackground)
         }
 
-        private var tintGradient: LinearGradient {
-            LinearGradient(
-                colors: [
-                    Color(hex: colorHex, opacity: colorScheme == .light ? 0.28 : 0.42),
-                    Color(hex: colorHex, opacity: colorScheme == .light ? 0.16 : 0.3),
-                    Color(hex: colorHex, opacity: colorScheme == .light ? 0.08 : 0.18)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+        private var accentColor: Color {
+            Color(hex: colorHex, opacity: colorScheme == .light ? 0.92 : 0.82)
         }
 
         var body: some View {
             let cardShape = RoundedRectangle(cornerRadius: DayView.Layout.eventCardCornerRadius, style: .continuous)
+            let accentOpacityBoost = isFocused ? 1.12 : 1
+            let primaryShadowColor = Color(
+                hex: colorHex,
+                opacity: colorScheme == .light
+                ? (isFocused ? 0.26 : 0.18)
+                : (isFocused ? 0.32 : 0.24)
+            )
+            let ambientShadowColor = Color(
+                hex: colorHex,
+                opacity: colorScheme == .light
+                ? (isFocused ? 0.12 : 0)
+                : (isFocused ? 0.14 : 0)
+            )
 
             cardShape
                 .fill(backgroundColor)
                 .overlay {
                     cardShape
-                        .fill(tintGradient)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: colorHex, opacity: (colorScheme == .light ? 0.28 : 0.42) * accentOpacityBoost),
+                                    Color(hex: colorHex, opacity: (colorScheme == .light ? 0.16 : 0.3) * accentOpacityBoost),
+                                    Color(hex: colorHex, opacity: (colorScheme == .light ? 0.08 : 0.18) * accentOpacityBoost)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
                 .overlay {
                     cardShape
                         .stroke(
-                            Color(hex: colorHex, opacity: colorScheme == .light ? 0.26 : 0.38),
-                            lineWidth: 1
+                            Color(hex: colorHex, opacity: colorScheme == .light ? (isFocused ? 0.34 : 0.26) : (isFocused ? 0.46 : 0.38)),
+                            lineWidth: isFocused ? 1.2 : 1
                         )
                 }
                 .clipShape(cardShape)
                 .shadow(
-                    color: Color(hex: colorHex, opacity: colorScheme == .light ? 0.18 : 0.24),
-                    radius: colorScheme == .light ? 10 : 8,
+                    color: primaryShadowColor,
+                    radius: colorScheme == .light ? (isFocused ? 18 : 10) : (isFocused ? 14 : 8),
                     x: 0,
-                    y: colorScheme == .light ? 5 : 3
+                    y: colorScheme == .light ? (isFocused ? 12 : 5) : (isFocused ? 8 : 3)
+                )
+                .shadow(
+                    color: ambientShadowColor,
+                    radius: isSeparated ? 10 : 0,
+                    x: 0,
+                    y: isSeparated ? 2 : 0
                 )
                 .overlay(alignment: .topLeading) {
                     content()
                 }
+                .overlay(alignment: .topTrailing) {
+                    if let overlapLayout, overlapLayout.isOverlapping {
+                        EventCardStateIndicatorView(
+                            overlapLayout: overlapLayout,
+                            color: accentColor,
+                            colorScheme: colorScheme,
+                            isExpanded: isSeparated
+                        )
+                        .padding(.top, 9)
+                        .padding(.trailing, 10)
+                    }
+                }
+                .opacity(isDimmed ? DayView.Layout.overlapDimmedOpacity : 1)
+        }
+    }
+
+    private struct EventCardStateIndicatorView: View {
+        let overlapLayout: DayEventOverlapLayout
+        let color: Color
+        let colorScheme: ColorScheme
+        let isExpanded: Bool
+
+        private var collapsedLayerCount: Int {
+            min(max(overlapLayout.groupSize, 2), 3)
+        }
+
+        private var expandedNodeCount: Int {
+            min(max(overlapLayout.groupSize, 2), 4)
+        }
+
+        private var highlightedNodeIndex: Int {
+            min(overlapLayout.orderIndex, expandedNodeCount - 1)
+        }
+
+        private var chipBackground: Color {
+            colorScheme == .light
+            ? Color(UIColor.systemBackground).opacity(0.82)
+            : Color(UIColor.secondarySystemBackground).opacity(0.64)
+        }
+
+        var body: some View {
+            Group {
+                if isExpanded {
+                    VStack(spacing: 3) {
+                        ForEach(0..<expandedNodeCount, id: \.self) { index in
+                            Capsule()
+                                .fill(index == highlightedNodeIndex ? color : color.opacity(0.22))
+                                .frame(width: index == highlightedNodeIndex ? 10 : 6, height: 4)
+                        }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 7)
+                    .background {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(chipBackground)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(color.opacity(0.16), lineWidth: 1)
+                            }
+                    }
+                } else {
+                    ZStack(alignment: .topLeading) {
+                        ForEach(0..<collapsedLayerCount, id: \.self) { index in
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(chipBackground)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .stroke(color.opacity(index == 0 ? 0.44 : 0.24), lineWidth: 0.9)
+                                }
+                                .frame(width: 12, height: 9)
+                                .offset(x: CGFloat(index) * 2.4, y: CGFloat(index) * 1.9)
+                        }
+                    }
+                    .frame(width: 18, height: 14, alignment: .topLeading)
+                }
+            }
+            .shadow(
+                color: color.opacity(isExpanded ? 0.16 : 0.08),
+                radius: isExpanded ? 6 : 3,
+                x: 0,
+                y: isExpanded ? 3 : 1
+            )
+            .animation(DayView.Layout.overlapAnimation, value: isExpanded)
+            .accessibilityHidden(true)
         }
     }
 
@@ -714,6 +851,7 @@ struct DayView: View {
         let colorHex: String
         let colorScheme: ColorScheme
         let isCompact: Bool
+        let showsOverlapIndicator: Bool
 
         private var accentColor: Color {
             Color(hex: colorHex, opacity: colorScheme == .light ? 0.9 : 0.78)
@@ -743,6 +881,7 @@ struct DayView: View {
                             .truncationMode(.tail)
                     }
                 }
+                .padding(.trailing, showsOverlapIndicator ? (isCompact ? 18 : 24) : 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, DayView.Layout.eventCardHorizontalPadding)
@@ -760,13 +899,14 @@ struct DayView: View {
         let previewHeight: CGFloat
 
         var body: some View {
-            EventCardSurfaceView(colorHex: colorHex, colorScheme: colorScheme) {
+            EventCardSurfaceView(colorHex: colorHex, colorScheme: colorScheme, overlapLayout: nil) {
                 EventCardContentView(
                     title: title,
                     detail: detail,
                     colorHex: colorHex,
                     colorScheme: colorScheme,
-                    isCompact: false
+                    isCompact: false,
+                    showsOverlapIndicator: false
                 )
             }
             .frame(width: previewWidth, height: previewHeight, alignment: .topLeading)
@@ -785,28 +925,222 @@ struct DayView: View {
         "\(info.schedule.startTime()) - \(info.schedule.finishTime())・\(scheduleClassroom(info))"
     }
 
+    private func scheduleEventID(_ info: ScheduleInfo) -> String {
+        "schedule:\(info.id)"
+    }
+
+    private func customScheduleEventID(_ info: CustomSchedule) -> String {
+        let fallbackID = "\(info.name)-\(info.begin.timeIntervalSince1970)-\(info.end.timeIntervalSince1970)"
+        return "custom:\(info.id.map(String.init) ?? fallbackID)"
+    }
+
+    private func scheduleDescriptor(_ info: ScheduleInfo) -> TimedEventDescriptor {
+        let height = info.schedule.height()
+        let centerY = info.schedule.y()
+        return TimedEventDescriptor(
+            id: scheduleEventID(info),
+            start: centerY - height / 2,
+            end: centerY + height / 2
+        )
+    }
+
+    private func customScheduleDescriptor(_ info: CustomSchedule) -> TimedEventDescriptor {
+        let height = info.height()
+        let centerY = info.y()
+        return TimedEventDescriptor(
+            id: customScheduleEventID(info),
+            start: centerY - height / 2,
+            end: centerY + height / 2
+        )
+    }
+
+    private func computeOverlapLayouts(for events: [TimedEventDescriptor]) -> [String: DayEventOverlapLayout] {
+        let sortedEvents = events.sorted { lhs, rhs in
+            if lhs.start == rhs.start {
+                if lhs.end == rhs.end {
+                    return lhs.id < rhs.id
+                }
+                return lhs.end < rhs.end
+            }
+            return lhs.start < rhs.start
+        }
+
+        var result: [String: DayEventOverlapLayout] = [:]
+        var currentGroup: [TimedEventDescriptor] = []
+        var currentGroupMaxEnd: CGFloat = 0
+
+        func flushCurrentGroup() {
+            guard !currentGroup.isEmpty else { return }
+            defer {
+                currentGroup.removeAll(keepingCapacity: true)
+                currentGroupMaxEnd = 0
+            }
+
+            guard currentGroup.count > 1 else {
+                let event = currentGroup[0]
+                result[event.id] = DayEventOverlapLayout(
+                    groupID: nil,
+                    orderIndex: 0,
+                    groupSize: 1,
+                    expandedCenter: (event.start + event.end) / 2
+                )
+                return
+            }
+
+            let groupID = "day-overlap:\(currentGroup.map(\.id).joined(separator: "|"))"
+            let groupStart = currentGroup.map(\.start).min() ?? 0
+            let groupEnd = currentGroup.map(\.end).max() ?? 1
+            let groupCenter = (groupStart + groupEnd) / 2
+            let totalHeight = currentGroup.reduce(CGFloat(0)) { partialResult, event in
+                partialResult + (event.end - event.start)
+            } + Layout.overlapStackSpacingRatio * CGFloat(max(currentGroup.count - 1, 0))
+            var currentTop = max(0, min(groupCenter - totalHeight / 2, 1 - totalHeight))
+
+            for (index, event) in currentGroup.enumerated() {
+                let eventHeight = event.end - event.start
+                let expandedCenter = currentTop + eventHeight / 2
+
+                result[event.id] = DayEventOverlapLayout(
+                    groupID: groupID,
+                    orderIndex: index,
+                    groupSize: currentGroup.count,
+                    expandedCenter: expandedCenter
+                )
+
+                currentTop += eventHeight + Layout.overlapStackSpacingRatio
+            }
+        }
+
+        for event in sortedEvents {
+            guard !currentGroup.isEmpty else {
+                currentGroup = [event]
+                currentGroupMaxEnd = event.end
+                continue
+            }
+
+            if event.start < currentGroupMaxEnd {
+                currentGroup.append(event)
+                currentGroupMaxEnd = max(currentGroupMaxEnd, event.end)
+            } else {
+                flushCurrentGroup()
+                currentGroup = [event]
+                currentGroupMaxEnd = event.end
+            }
+        }
+
+        flushCurrentGroup()
+        return result
+    }
+
+    private func eventCardPlacement(for overlapLayout: DayEventOverlapLayout?, baseYPosition: CGFloat, containerHeight: CGFloat) -> EventCardPlacement {
+        let isExpanded = overlapLayout?.groupID != nil && overlapLayout?.groupID == expandedOverlapGroupID
+        let isDimmed = expandedOverlapGroupID != nil && !isExpanded
+
+        guard isExpanded, let overlapLayout else {
+            return EventCardPlacement(
+                yPosition: baseYPosition,
+                isSeparated: false,
+                isDimmed: isDimmed
+            )
+        }
+
+        return EventCardPlacement(
+            yPosition: overlapLayout.expandedCenter * containerHeight,
+            isSeparated: true,
+            isDimmed: false
+        )
+    }
+
+    private func eventCardZIndex(for overlapLayout: DayEventOverlapLayout?, yPosition: CGFloat) -> Double {
+        let baseZIndex = Double(yPosition) * 1000
+
+        guard let overlapLayout else {
+            return baseZIndex
+        }
+
+        if overlapLayout.groupID == expandedOverlapGroupID {
+            return 10_000 + baseZIndex + Double(overlapLayout.groupSize - overlapLayout.orderIndex)
+        }
+
+        if expandedOverlapGroupID != nil {
+            return baseZIndex / 10
+        }
+
+        return baseZIndex
+    }
+
+    private func collapseExpandedOverlapGroup(animated: Bool = true) {
+        guard expandedOverlapGroupID != nil else { return }
+
+        if animated {
+            withAnimation(Layout.overlapAnimation) {
+                expandedOverlapGroupID = nil
+            }
+        } else {
+            expandedOverlapGroupID = nil
+        }
+    }
+
+    private func handleEventTap(eventID: String, defaultAction: @escaping () -> Void) {
+        guard let overlapLayout = overlapLayoutsByEventID[eventID], overlapLayout.isOverlapping, let groupID = overlapLayout.groupID else {
+            if expandedOverlapGroupID != nil {
+                collapseExpandedOverlapGroup()
+            } else {
+                defaultAction()
+            }
+            return
+        }
+
+        guard expandedOverlapGroupID == groupID else {
+            withAnimation(Layout.overlapAnimation) {
+                expandedOverlapGroupID = groupID
+            }
+            return
+        }
+
+        defaultAction()
+    }
+
     @ViewBuilder
     private func eventCard<MenuContent: View>(
+        eventID: String,
+        overlapLayout: DayEventOverlapLayout?,
         colorHex: String,
         title: String,
         detail: String,
         cardHeight: CGFloat,
         yPosition: CGFloat,
-        onTap: @escaping () -> Void,
+        containerHeight: CGFloat,
+        defaultOnTap: @escaping () -> Void,
         @ViewBuilder menuContent: @escaping () -> MenuContent
     ) -> some View {
         GeometryReader { geometry in
-            EventCardSurfaceView(colorHex: colorHex, colorScheme: colorScheme) {
+            let cardWidth = max(geometry.size.width - 4, 1)
+            let placement = eventCardPlacement(
+                for: overlapLayout,
+                baseYPosition: yPosition,
+                containerHeight: containerHeight
+            )
+            let isFocused = overlapLayout?.groupID != nil && overlapLayout?.groupID == expandedOverlapGroupID
+
+            EventCardSurfaceView(
+                colorHex: colorHex,
+                colorScheme: colorScheme,
+                overlapLayout: overlapLayout,
+                isSeparated: placement.isSeparated,
+                isFocused: isFocused,
+                isDimmed: placement.isDimmed
+            ) {
                 EventCardContentView(
                     title: title,
                     detail: detail,
                     colorHex: colorHex,
                     colorScheme: colorScheme,
-                    isCompact: cardHeight < Layout.eventCardCompactThreshold
+                    isCompact: cardHeight < Layout.eventCardCompactThreshold,
+                    showsOverlapIndicator: overlapLayout?.isOverlapping == true
                 )
             }
                 .contentShape(RoundedRectangle(cornerRadius: Layout.eventCardCornerRadius, style: .continuous))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contextMenu {
                     menuContent()
                 } preview: {
@@ -815,13 +1149,16 @@ struct DayView: View {
                         detail: detail,
                         colorHex: colorHex,
                         colorScheme: colorScheme,
-                        previewWidth: min(geometry.size.width, 340),
+                        previewWidth: min(cardWidth, 340),
                         previewHeight: max(cardHeight, 72)
                     )
                 }
-                .frame(height: cardHeight)
-                .position(x: geometry.size.width / 2, y: yPosition)
-                .onTapGesture(perform: onTap)
+                .frame(width: cardWidth, height: cardHeight, alignment: .topLeading)
+                .position(x: geometry.size.width / 2, y: placement.yPosition)
+                .zIndex(eventCardZIndex(for: overlapLayout, yPosition: yPosition))
+                .onTapGesture {
+                    handleEventTap(eventID: eventID, defaultAction: defaultOnTap)
+                }
         }
         .padding([.leading, .trailing], 2)
     }
@@ -833,12 +1170,15 @@ struct DayView: View {
             let cardHeight = info.height() * containerHeight
 
             eventCard(
+                eventID: customScheduleEventID(info),
+                overlapLayout: overlapLayoutsByEventID[customScheduleEventID(info)],
                 colorHex: colorHex,
                 title: info.name,
                 detail: customScheduleDetail(info),
                 cardHeight: cardHeight,
                 yPosition: info.y() * containerHeight,
-                onTap: { onCustomScheduleTouch(info) }
+                containerHeight: containerHeight,
+                defaultOnTap: { onCustomScheduleTouch(info) }
             ) {
                 Button {
                     onCustomScheduleTouch(info)
@@ -869,12 +1209,15 @@ struct DayView: View {
             let cardHeight = info.schedule.height() * containerHeight
 
             eventCard(
+                eventID: scheduleEventID(info),
+                overlapLayout: overlapLayoutsByEventID[scheduleEventID(info)],
                 colorHex: info.class_.color,
                 title: info.course.name,
                 detail: scheduleDetail(info),
                 cardHeight: cardHeight,
                 yPosition: info.schedule.y() * containerHeight,
-                onTap: { onScheduleTouch(info) }
+                containerHeight: containerHeight,
+                defaultOnTap: { onScheduleTouch(info) }
             ) {
                 Button {
                     onScheduleTouch(info)
@@ -949,6 +1292,15 @@ struct DayView: View {
                     dividerColor: hourGridDividerColor
                 )
 
+                if expandedOverlapGroupID != nil {
+                    Rectangle()
+                        .fill(Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            collapseExpandedOverlapGroup()
+                        }
+                }
+
                 ZStack(alignment: .top) {
                     customScheduleCards(containerHeight: containerHeight)
                     scheduleCards(containerHeight: containerHeight)
@@ -958,6 +1310,7 @@ struct DayView: View {
 
                 if let nowPosition {
                     nowTimeIndicator(containerHeight: containerHeight, nowPosition: nowPosition)
+                        .zIndex(20_000)
                 }
             }
             .padding([.top, .bottom], Layout.axisVerticalPadding)
@@ -972,7 +1325,15 @@ struct DayView: View {
         .task {
             updateCurrentTime()
         }
+        .onChange(of: schedules) {
+            collapseExpandedOverlapGroup(animated: false)
+        }
+        .onChange(of: customSchedules) {
+            collapseExpandedOverlapGroup(animated: false)
+        }
+        .animation(Layout.overlapAnimation, value: expandedOverlapGroupID)
         .animation(.easeInOut, value: schedules)
+        .animation(.easeInOut, value: customSchedules)
     }
 }
 
@@ -1423,7 +1784,7 @@ struct DayTabView: View {
                     } action: { _, value in
                         onVerticalContentOffsetChange(day, value)
                     }
-                    .frame(width: UIScreen.main.bounds.width)
+                    .containerRelativeFrame(.horizontal)
                 }
             }
             .scrollTargetLayout()
@@ -1462,10 +1823,6 @@ struct WeekScheduleTabView: View {
     @State private var data = Array(-Self.initialWindowRadius...Self.initialWindowRadius)
 
     private let windowRadius = Self.initialWindowRadius
-
-    private var pageWidth: CGFloat {
-        UIScreen.main.bounds.width - (displayMode == .week ? weekModeLeading : 0)
-    }
 
     init(selectedDay: Binding<Date>, colleges: [College], baseDay: Date, displayMode: DisplayMode, onScheduleTouch: @escaping (ScheduleInfo) -> Void, onCustomScheduleTouch: @escaping (CustomSchedule) -> Void) {
         self._selectedDay = selectedDay
@@ -1510,7 +1867,7 @@ struct WeekScheduleTabView: View {
                 ForEach(data, id: \.self) { offset in
                     let day = baseDay.addWeeks(offset)
                     WeekScheduleView(day: day, colleges: colleges, onScheduleTouch: onScheduleTouch, onCustomScheduleTouch: onCustomScheduleTouch)
-                        .frame(width: pageWidth)
+                        .containerRelativeFrame(.horizontal)
                 }
             }
             .scrollTargetLayout()

@@ -8,8 +8,17 @@
 import SwiftUI
 import GRDB
 import Apollo
+import UIKit
 
 struct CanvasSettingsView: View {
+    @AppStorage("accounts") private var accounts: [WebAuthAccount] = []
+    @State private var showCopyTokenConfirmation = false
+    @State private var showCopySuccessAlert = false
+
+    private var canvasToken: String? {
+        accounts.jaccountCanvasToken
+    }
+
     var body: some View {
         List {
             Section {
@@ -25,9 +34,50 @@ struct CanvasSettingsView: View {
                     .padding(.vertical, 2)
                 }
             }
+
+            Section {
+                Button {
+                    showCopyTokenConfirmation = true
+                } label: {
+                    Label("复制 Canvas 令牌", systemImage: "document.on.doc")
+                }
+                .disabled(canvasToken == nil)
+            } header: {
+                Text("Canvas 令牌")
+            } footer: {
+                if canvasToken == nil {
+                    Text("当前没有可复制的 Canvas 令牌，请先在账户设置中启用 Canvas。")
+                } else {
+                    Text("如果您有使用不同 Apple ID 登录的设备，可以通过手动输入 Canvas 令牌来启用 Canvas 功能。")
+                }
+            }
         }
         .navigationTitle("Canvas")
         .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog("复制 Canvas 令牌", isPresented: $showCopyTokenConfirmation, titleVisibility: .visible) {
+            Button("复制令牌") {
+                copyCanvasToken()
+            }
+            Button("取消", role: .cancel) {
+            }
+        } message: {
+            Text("Canvas 令牌相当于您的账户访问凭证，请不要提供给不受信任的第三方。")
+        }
+        .alert("已复制 Canvas 令牌", isPresented: $showCopySuccessAlert) {
+            Button("知道了", role: .cancel) {
+            }
+        } message: {
+            Text("Canvas 令牌已复制到剪贴板。")
+        }
+    }
+
+    private func copyCanvasToken() {
+        guard let canvasToken else {
+            return
+        }
+
+        UIPasteboard.general.string = canvasToken
+        showCopySuccessAlert = true
     }
 }
 
@@ -219,7 +269,7 @@ struct CanvasCourseMatchingSettingsView: View {
 
         let displayedCourses = localCourses.filter { $0.college == displayedCollege }
         var usedCanvasCourseIDs = Set(displayedCourses.compactMap(\.canvasCourseID))
-        var pendingMatches: [(canvasCourseID: String, localCourse: LocalCanvasCourse)] = []
+        var collectedMatches: [(canvasCourseID: String, localCourse: LocalCanvasCourse)] = []
 
         for course in displayedCourses where course.canvasCourseID == nil {
             if let matchedCourse = canvasCourses.first(where: { canvasCourse in
@@ -232,14 +282,15 @@ struct CanvasCourseMatchingSettingsView: View {
                 return courseCode.contains(course.classCode)
             }) {
                 usedCanvasCourseIDs.insert(matchedCourse.id)
-                pendingMatches.append((canvasCourseID: matchedCourse.id, localCourse: course))
+                collectedMatches.append((canvasCourseID: matchedCourse.id, localCourse: course))
             }
         }
 
-        guard !pendingMatches.isEmpty else {
+        guard !collectedMatches.isEmpty else {
             return false
         }
 
+        let pendingMatches = collectedMatches
         try await pool.write { db in
             for match in pendingMatches {
                 try CanvasClass.replaceMatch(
@@ -330,27 +381,27 @@ struct CanvasCourseMatchingSettingsView: View {
                 .filter(canvasColleges.contains(Column("college")))
                 .fetchAll(db)
 
-            let semesterByID = Dictionary(uniqueKeysWithValues: semesters.map { (semesterStorageKey(id: $0.id, college: $0.college), $0) })
-            let courseByID = Dictionary(uniqueKeysWithValues: courses.map { (courseStorageKey(code: $0.code, college: $0.college), $0) })
+            let semesterByID = Dictionary(uniqueKeysWithValues: semesters.map { (Self.semesterStorageKey(id: $0.id, college: $0.college), $0) })
+            let courseByID = Dictionary(uniqueKeysWithValues: courses.map { (Self.courseStorageKey(code: $0.code, college: $0.college), $0) })
             let mappingByClassID = mappings.reduce(into: [String: CanvasClass]()) { result, mapping in
-                result[classStorageKey(id: mapping.class_id, college: mapping.college)] = mapping
+                result[Self.classStorageKey(id: mapping.class_id, college: mapping.college)] = mapping
             }
 
             return classes.compactMap { class_ in
-                guard let semester = semesterByID[semesterStorageKey(id: class_.semester_id, college: class_.college)] else {
+                guard let semester = semesterByID[Self.semesterStorageKey(id: class_.semester_id, college: class_.college)] else {
                     return nil
                 }
 
-                let course = courseByID[courseStorageKey(code: class_.course_code, college: class_.college)]
-                let mapping = mappingByClassID[classStorageKey(id: class_.id, college: class_.college)]
+                let course = courseByID[Self.courseStorageKey(code: class_.course_code, college: class_.college)]
+                let mapping = mappingByClassID[Self.classStorageKey(id: class_.id, college: class_.college)]
 
                 return LocalCanvasCourse(
                     classID: class_.id,
                     college: class_.college,
                     courseName: course?.name ?? class_.name,
                     classCode: class_.code,
-                    semesterTitle: semesterDisplayTitle(for: semester),
-                    semesterGroupID: semesterStorageKey(id: semester.id, college: semester.college),
+                    semesterTitle: Self.semesterDisplayTitle(for: semester),
+                    semesterGroupID: Self.semesterStorageKey(id: semester.id, college: semester.college),
                     semesterStartAt: semester.start_at,
                     canvasCourseID: mapping?.id
                 )
@@ -376,7 +427,7 @@ struct CanvasCourseMatchingSettingsView: View {
         return try await api.getAllCourseOptions()
     }
 
-    private func semesterDisplayTitle(for semester: Semester) -> String {
+    nonisolated private static func semesterDisplayTitle(for semester: Semester) -> String {
         if let name = semester.name, !name.isEmpty {
             return name
         }
@@ -391,15 +442,15 @@ struct CanvasCourseMatchingSettingsView: View {
         return "\(semester.year) 学年\(seasonName)季学期"
     }
 
-    private func semesterStorageKey(id: String, college: College) -> String {
+    nonisolated private static func semesterStorageKey(id: String, college: College) -> String {
         "\(college.rawValue)-\(id)"
     }
 
-    private func courseStorageKey(code: String, college: College) -> String {
+    nonisolated private static func courseStorageKey(code: String, college: College) -> String {
         "\(college.rawValue)-\(code)"
     }
 
-    private func classStorageKey(id: String, college: College) -> String {
+    nonisolated private static func classStorageKey(id: String, college: College) -> String {
         "\(college.rawValue)-\(id)"
     }
 }

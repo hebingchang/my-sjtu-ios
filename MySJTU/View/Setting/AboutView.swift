@@ -11,6 +11,15 @@ import AcknowList
 struct AboutView: View {
     private let shuiyuanDiscussionURL = URL(string: "https://shuiyuan.sjtu.edu.cn/t/topic/328264")!
     private let discussionQQGroupURL = URL(string: "https://qun.qq.com/universal-share/share?ac=1&authKey=iDf20PJOunNvVPGaO6NQ%2BFevvbU85qw2zejAIz15NQKmU%2BC80y3QpO7VQpCcEJVq&busi_data=eyJncm91cENvZGUiOiIxODYyODc2NTEiLCJ0b2tlbiI6Imh4Y0tXOVM3akdnMjBHcm9id3liM0Q1TWFid0NYWXI0WkhISjlEa0wrSiswOUJFYWRSZjFrVnZmdC92VE55OGUiLCJ1aW4iOiI5MzQ2MzI0MzcifQ%3D%3D&data=mn6ahZlKvwnRqtY0ZJpNeLTwNOVVIFjeS6aaxXXFe0qHMGjCTsdzXmteeZ22Ow2k_SJfzzYot4CQMwD4llIKTg&svctype=4&tempid=h5_group_info")!
+
+    private var versionDescription: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+
+        if shortVersion.isEmpty { return buildVersion }
+        if buildVersion.isEmpty { return shortVersion }
+        return "\(shortVersion)+\(buildVersion)"
+    }
     
     var body: some View {
         List {
@@ -18,7 +27,7 @@ struct AboutView: View {
                 HStack {
                     Label("版本", systemImage: "info.circle")
                     Spacer()
-                    Text("\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "")+\(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "")")
+                    Text(versionDescription)
                         .font(.callout)
                         .foregroundStyle(Color(UIColor.secondaryLabel))
                 }

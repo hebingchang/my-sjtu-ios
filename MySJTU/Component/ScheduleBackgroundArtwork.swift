@@ -59,16 +59,15 @@ struct ScheduleBackgroundEffectConfiguration: Equatable {
         )
     }
 
-    static var maximumBackgroundAspectRatio: CGFloat {
-        let screenBounds = UIScreen.main.bounds
-        let width = min(screenBounds.width, screenBounds.height)
-        let height = max(screenBounds.width, screenBounds.height)
+    static func maximumBackgroundAspectRatio(for viewportSize: CGSize) -> CGFloat {
+        let width = min(viewportSize.width, viewportSize.height)
+        let height = max(viewportSize.width, viewportSize.height)
         guard width > 0, height > 0 else { return 9.0 / 19.5 }
         return width / height
     }
 
-    static var parallaxBackgroundAspectRatio: CGFloat {
-        maximumBackgroundAspectRatio * parallaxCropAspectRatioMultiplier
+    static func parallaxBackgroundAspectRatio(for viewportSize: CGSize) -> CGFloat {
+        maximumBackgroundAspectRatio(for: viewportSize) * parallaxCropAspectRatioMultiplier
     }
 
     static func imageAspectRatio(for imageSize: CGSize) -> CGFloat? {
@@ -76,15 +75,17 @@ struct ScheduleBackgroundEffectConfiguration: Equatable {
         return imageSize.width / imageSize.height
     }
 
-    static func constrainedBackgroundAspectRatio(for imageSize: CGSize) -> CGFloat {
+    static func constrainedBackgroundAspectRatio(for imageSize: CGSize, viewportSize: CGSize) -> CGFloat {
         guard let imageAspectRatio = imageAspectRatio(for: imageSize) else {
-            return maximumBackgroundAspectRatio
+            return maximumBackgroundAspectRatio(for: viewportSize)
         }
-        return min(imageAspectRatio, maximumBackgroundAspectRatio)
+        return min(imageAspectRatio, maximumBackgroundAspectRatio(for: viewportSize))
     }
 
-    static func cropAspectRatio(for imageSize: CGSize, parallaxEnabled: Bool) -> CGFloat {
-        return parallaxEnabled ? parallaxBackgroundAspectRatio : maximumBackgroundAspectRatio
+    static func cropAspectRatio(for imageSize: CGSize, parallaxEnabled: Bool, viewportSize: CGSize) -> CGFloat {
+        return parallaxEnabled
+        ? parallaxBackgroundAspectRatio(for: viewportSize)
+        : maximumBackgroundAspectRatio(for: viewportSize)
     }
 }
 

@@ -34,6 +34,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
         return sceneConfiguration
     }
+
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        CanvasVideoOrientationController.currentMask
+    }
 }
 
 class CustomSceneDelegate: UIResponder, UIWindowSceneDelegate {

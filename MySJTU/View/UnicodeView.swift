@@ -36,9 +36,11 @@ struct UnicodeView: View {
     @State private var qrShape: QRCodeShape?
     @State private var user: WebAuthUser?
     @State private var originalBrightness: CGFloat?
+    @State private var brightnessScreen: UIScreen?
     @State private var showPhotosPicker: Bool = false
     @State private var croppedAvatarImage: UIImage?
     @State private var photoBackground: Color?
+    @State private var currentScreen: UIScreen?
     @Environment(\.scenePhase) var scenePhase
     @EnvironmentObject private var appConfig: AppConfig
 
@@ -131,6 +133,29 @@ struct UnicodeView: View {
     
     private func deletePhoto(url: URL) throws {
         try FileManager.default.removeItem(at: url)
+    }
+
+    private func beginBrightnessSession() {
+        guard let currentScreen else { return }
+
+        if brightnessScreen === currentScreen, originalBrightness != nil {
+            currentScreen.setBrightness(to: 1.0)
+            return
+        }
+
+        endBrightnessSession()
+        brightnessScreen = currentScreen
+        originalBrightness = currentScreen.brightness
+        currentScreen.setBrightness(to: 1.0)
+    }
+
+    private func endBrightnessSession() {
+        if let brightnessScreen, let originalBrightness {
+            brightnessScreen.setBrightness(to: originalBrightness)
+        }
+
+        originalBrightness = nil
+        brightnessScreen = nil
     }
 
     var body: some View {
@@ -249,33 +274,26 @@ struct UnicodeView: View {
                     .blur(radius: 100)
                 }
                 .onAppear() {
-                    originalBrightness = UIScreen.main.brightness
-                    UIScreen.main.setBrightness(to: CGFloat(1.0))
+                    beginBrightnessSession()
                 }
                 .onDisappear() {
-                    if let originalBrightness {
-                        UIScreen.main.setBrightness(to: originalBrightness)
-                    }
-                    originalBrightness = nil
+                    endBrightnessSession()
                 }
                 .onChange(of: scenePhase) {
                     switch scenePhase {
                     case .active:
-                        originalBrightness = UIScreen.main.brightness
-                        UIScreen.main.setBrightness(to: CGFloat(1.0))
+                        beginBrightnessSession()
                     case .background:
-                        if let originalBrightness {
-                            UIScreen.main.setBrightness(to: originalBrightness)
-                        }
-                        originalBrightness = nil
+                        endBrightnessSession()
                     case .inactive:
-                        if let originalBrightness {
-                            UIScreen.main.setBrightness(to: originalBrightness)
-                        }
-                        originalBrightness = nil
+                        endBrightnessSession()
                     default:
                         break
                     }
+                }
+                .onChange(of: currentScreen) { _, _ in
+                    guard scenePhase == .active else { return }
+                    beginBrightnessSession()
                 }
                 .cropImagePicker(cropType: .circle, show: $showPhotosPicker, croppedImage: $croppedAvatarImage)
                 .onChange(of: croppedAvatarImage) { _, croppedImage in
@@ -289,6 +307,9 @@ struct UnicodeView: View {
                         print(error)
                     }
                     self.croppedAvatarImage = nil
+                }
+                .onContextScreenChange { screen in
+                    currentScreen = screen
                 }
             } else {
                 ProgressView()

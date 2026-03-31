@@ -19,6 +19,7 @@ struct CanvasLinkView: View {
     @State private var secondaryButtonLoading = false
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
+    @State private var isShowingManualTokenInput = false
 
     private enum CanvasLinkStatus {
         case initializing
@@ -65,6 +66,13 @@ struct CanvasLinkView: View {
         .padding()
         .task {
             await loadInitialStatus()
+        }
+        .sheet(isPresented: $isShowingManualTokenInput) {
+            NavigationStack {
+                CanvasManualTokenInputView { token in
+                    try await importTokenManually(token)
+                }
+            }
         }
         .alert("错误", isPresented: $showErrorAlert) {
         } message: {
@@ -133,9 +141,32 @@ struct CanvasLinkView: View {
                 }
                 .disabled(isActionDisabled)
 
-            case .tokenExists, .beforeCreateToken:
+            case .tokenExists:
                 loadingPrimaryButton(
-                    title: status == .tokenExists ? "重新生成令牌" : "创建令牌",
+                    title: "重新生成令牌",
+                    isLoading: primaryButtonLoading
+                ) {
+                    primaryButtonLoading = true
+                    Task {
+                        defer { primaryButtonLoading = false }
+                        await createCanvasToken()
+                    }
+                }
+
+                Button("手动输入令牌") {
+                    isShowingManualTokenInput = true
+                }
+                .disabled(isActionDisabled)
+                .padding(.bottom, 16)
+
+                Button("取消") {
+                    dismiss()
+                }
+                .disabled(isActionDisabled)
+
+            case .beforeCreateToken:
+                loadingPrimaryButton(
+                    title: "创建令牌",
                     isLoading: primaryButtonLoading
                 ) {
                     primaryButtonLoading = true
@@ -195,6 +226,15 @@ struct CanvasLinkView: View {
         "\(account.user.account)_canvas_token"
     }
 
+    @MainActor
+    private func storeCanvasToken(_ token: String, for account: WebAuthAccount, at index: Int) {
+        accounts[index].bizData["canvas_token"] = token
+        if !accounts[index].enabledFeatures.contains(.canvas) {
+            accounts[index].enabledFeatures.append(.canvas)
+        }
+        NSUbiquitousKeyValueStore.default.set(token, forKey: canvasTokenStoreKey(for: account))
+    }
+
     private func iCloudToken(for account: WebAuthAccount) -> String? {
         NSUbiquitousKeyValueStore.default.string(forKey: canvasTokenStoreKey(for: account))
     }
@@ -208,8 +248,7 @@ struct CanvasLinkView: View {
 
         do {
             try await checkCanvasToken(token: token)
-            accounts[index].bizData["canvas_token"] = token
-            accounts[index].enabledFeatures.append(.canvas)
+            storeCanvasToken(token, for: account, at: index)
             status = .importFinished
         } catch APIError.sessionExpired {
             errorMessage = "iCloud 中的 Canvas 令牌已过期，请重新生成令牌"
@@ -235,6 +274,19 @@ struct CanvasLinkView: View {
         return newToken.token
     }
 
+    @MainActor
+    private func importTokenManually(_ token: String) async throws {
+        guard let index = currentAccountIndex() else {
+            throw APIError.noAccount
+        }
+
+        let account = accounts[index]
+        let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        try await checkCanvasToken(token: trimmedToken)
+        storeCanvasToken(trimmedToken, for: account, at: index)
+        status = .importFinished
+    }
+
     private func getExistingToken() async throws {
         guard let index = currentAccountIndex() else { return }
         let account = accounts[index]
@@ -256,9 +308,7 @@ struct CanvasLinkView: View {
         let account = accounts[index]
         do {
             let token = try await createCanvasToken(account: account)
-            accounts[index].bizData["canvas_token"] = token
-            accounts[index].enabledFeatures.append(.canvas)
-            NSUbiquitousKeyValueStore.default.set(token, forKey: canvasTokenStoreKey(for: account))
+            storeCanvasToken(token, for: account, at: index)
             status = .createFinished
         } catch APIError.noAccount {
             errorMessage = "当前 jAccount 没有有效的 Canvas 账户"
@@ -307,6 +357,90 @@ struct CanvasLinkView: View {
             errorMessage = "内部错误，请稍后重试"
         }
         status = .internalError
+    }
+}
+
+private struct CanvasManualTokenInputView: View {
+    let onSubmit: (String) async throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isTokenFieldFocused: Bool
+    @State private var token = ""
+    @State private var isSubmitting = false
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
+
+    private var trimmedToken: String {
+        token.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Canvas 令牌", text: $token, axis: .vertical)
+                    .lineLimit(4...8)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .focused($isTokenFieldFocused)
+            } footer: {
+                Text("如果您已在其他设备复制 Canvas 令牌，可将其粘贴到这里。")
+            }
+
+            Section {
+                Button {
+                    submitToken()
+                } label: {
+                    HStack {
+                        Spacer()
+                        if isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text("导入并启用 Canvas")
+                        }
+                        Spacer()
+                    }
+                }
+                .disabled(isSubmitting || trimmedToken.isEmpty)
+            }
+        }
+        .navigationTitle("手动输入令牌")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("取消") {
+                    dismiss()
+                }
+                .disabled(isSubmitting)
+            }
+        }
+        .task {
+            isTokenFieldFocused = true
+        }
+        .alert("错误", isPresented: $showErrorAlert) {
+        } message: {
+            Text(errorMessage)
+        }
+    }
+
+    private func submitToken() {
+        isSubmitting = true
+        Task {
+            defer { isSubmitting = false }
+            do {
+                try await onSubmit(trimmedToken)
+                dismiss()
+            } catch APIError.sessionExpired {
+                errorMessage = "手动输入的 Canvas 令牌无效或已过期，请检查后重试。"
+                showErrorAlert = true
+            } catch APIError.noAccount {
+                errorMessage = "当前 jAccount 没有有效的 Canvas 账户"
+                showErrorAlert = true
+            } catch {
+                errorMessage = "暂时无法验证该 Canvas 令牌，请稍后重试。"
+                showErrorAlert = true
+            }
+        }
     }
 }
 

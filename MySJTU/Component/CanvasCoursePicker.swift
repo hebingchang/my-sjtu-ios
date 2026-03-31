@@ -11,6 +11,7 @@ import Apollo
 
 struct CanvasCourseOption: Identifiable, Equatable {
     let id: String
+    let legacyID: String
     let name: String
     let courseCode: String?
     let termID: String?
@@ -18,6 +19,7 @@ struct CanvasCourseOption: Identifiable, Equatable {
 
     init(course: CanvasSchema.GetAllClassesQuery.Data.AllCourse) {
         id = course.id
+        legacyID = course._id
         name = course.name
         courseCode = course.courseCode
         termID = course.term?._id

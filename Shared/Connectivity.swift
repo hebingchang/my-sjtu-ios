@@ -58,7 +58,7 @@ final class Connectivity: NSObject, ObservableObject {
 }
 
 extension Connectivity: WCSessionDelegate {
-    func session(
+    nonisolated func session(
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
@@ -67,27 +67,33 @@ extension Connectivity: WCSessionDelegate {
             return
         }
 
-        sendLatestScheduleSnapshot()
+        Task { @MainActor in
+            self.sendLatestScheduleSnapshot()
+        }
     }
 
-    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         guard message[WatchScheduleSyncPayload.refreshCommand] != nil else {
             return
         }
 
-        sendLatestScheduleSnapshot()
+        Task { @MainActor in
+            self.sendLatestScheduleSnapshot()
+        }
     }
 
 #if os(iOS)
-    func sessionDidBecomeInactive(_ session: WCSession) {
+    nonisolated func sessionDidBecomeInactive(_ session: WCSession) {
     }
 
-    func sessionDidDeactivate(_ session: WCSession) {
-        WCSession.default.activate()
+    nonisolated func sessionDidDeactivate(_ session: WCSession) {
+        session.activate()
     }
 
-    func sessionWatchStateDidChange(_ session: WCSession) {
-        sendLatestScheduleSnapshot()
+    nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
+        Task { @MainActor in
+            self.sendLatestScheduleSnapshot()
+        }
     }
 #endif
 }

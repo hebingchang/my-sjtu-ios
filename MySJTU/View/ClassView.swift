@@ -31,6 +31,7 @@ struct ClassView: View {
     @State private var isLoadingAssignments: Bool = false
     @State private var isSavingCanvasMatch: Bool = false
     @State private var errorDetail: ClassViewError?
+    @State private var currentSemesterSchedules: [ScheduleInfo] = []
 
     private enum ClassViewError: Error {
         case canvasTokenExpired
@@ -87,11 +88,26 @@ struct ClassView: View {
         return selectedCanvasCourseDescription
     }
 
+    private var selectedCanvasCourseLegacyID: String? {
+        if let canvasClassInfo {
+            return canvasClassInfo._id
+        }
+
+        guard let canvasClassID = canvasClass?.id else {
+            return nil
+        }
+
+        return canvasCourses.idDictionary[canvasClassID]?.legacyID
+    }
+
     var body: some View {
         classInfoPage
         .animation(.easeInOut, value: assignments)
         .task {
             await loadClassRemark()
+        }
+        .task {
+            await loadCurrentSemesterSchedules()
         }
         .task {
             await loadCanvasClassIfNeeded()
@@ -155,6 +171,13 @@ struct ClassView: View {
                 }
             }
 
+            Section(header: Text("上课安排")) {
+                CourseScheduleOverviewView(
+                    schedules: displayedCurrentSemesterSchedules,
+                    colorHex: scheduleInfo.class_.color
+                )
+            }
+
             if isCanvasFeatureAvailable {
                 Section {
                     NavigationLink {
@@ -188,7 +211,7 @@ struct ClassView: View {
                     .disabled(canvasToken == nil && canvasClass == nil)
                 }
 
-                if canvasClass != nil {
+                if let canvasClass {
                     Section {
                         NavigationLink {
                             assignmentsPage
@@ -196,6 +219,15 @@ struct ClassView: View {
                                 .navigationBarTitleDisplayMode(.inline)
                         } label: {
                             Label("作业", systemImage: "book.pages")
+                        }
+
+                        NavigationLink {
+                            CanvasVideosView(
+                                courseID: canvasClass.id,
+                                courseLegacyID: selectedCanvasCourseLegacyID
+                            )
+                        } label: {
+                            Label("视频", systemImage: "play.rectangle")
                         }
                     }
                 }
@@ -217,6 +249,10 @@ struct ClassView: View {
                 }
             }
         )
+    }
+
+    private var displayedCurrentSemesterSchedules: [ScheduleInfo] {
+        currentSemesterSchedules.isEmpty ? [scheduleInfo] : currentSemesterSchedules
     }
 
     private var assignmentsPage: some View {
@@ -521,6 +557,49 @@ struct ClassView: View {
         }
     }
 
+    @MainActor
+    private func loadCurrentSemesterSchedules() async {
+        do {
+            guard let pool = Eloquent.pool else {
+                return
+            }
+
+            let schedules = try await pool.read { db in
+                let request = Schedule
+                    .including(required: Schedule.class_
+                        .including(required: Class.course)
+                        .filter(Column("semester_id") == scheduleInfo.class_.semester_id))
+                    .filter(
+                        Column("class_id") == scheduleInfo.class_.id &&
+                        Column("college") == scheduleInfo.class_.college &&
+                        Column("is_start") == true
+                    )
+
+                return try ScheduleInfo.fetchAll(db, request).sorted { lhs, rhs in
+                    if lhs.schedule.day != rhs.schedule.day {
+                        return lhs.schedule.day < rhs.schedule.day
+                    }
+
+                    if lhs.schedule.periodIndex() != rhs.schedule.periodIndex() {
+                        return lhs.schedule.periodIndex() < rhs.schedule.periodIndex()
+                    }
+
+                    if lhs.schedule.length != rhs.schedule.length {
+                        return lhs.schedule.length < rhs.schedule.length
+                    }
+
+                    return lhs.schedule.week < rhs.schedule.week
+                }
+            }
+
+            withAnimation {
+                currentSemesterSchedules = schedules
+            }
+        } catch {
+            print(error)
+        }
+    }
+
     private func loadCanvasClassIfNeeded() async {
         guard let token = canvasToken else { return }
 
@@ -576,6 +655,212 @@ struct ClassView: View {
             }
         } catch {
         }
+    }
+}
+
+private struct CourseScheduleOverviewView: View {
+    let schedules: [ScheduleInfo]
+    let colorHex: String
+
+    private var groupedSchedules: [CourseScheduleSlotGroup] {
+        CourseScheduleSlotGroup.makeGroups(from: schedules)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(groupedSchedules) { slot in
+                    HStack(alignment: .top, spacing: 10) {
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(Color(hex: colorHex))
+                            .frame(width: 6, height: 22)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(slot.weekdayText) · \(slot.periodText)")
+                                .font(.subheadline.weight(.medium))
+
+                            Text(slot.weekSummary)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct CourseScheduleBlockView: View {
+    let title: String
+    let colorHex: String
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+
+        shape
+            .fill(colorScheme == .light ? Color.systemBackground : Color.secondarySystemBackground)
+            .overlay {
+                shape
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: colorHex, opacity: colorScheme == .light ? 0.28 : 0.40),
+                                Color(hex: colorHex, opacity: colorScheme == .light ? 0.18 : 0.28),
+                                Color(hex: colorHex, opacity: colorScheme == .light ? 0.08 : 0.16)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .overlay {
+                shape
+                    .stroke(
+                        Color(hex: colorHex, opacity: colorScheme == .light ? 0.24 : 0.34),
+                        lineWidth: 1
+                    )
+            }
+            .overlay {
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.72)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 3)
+            }
+            .shadow(
+                color: Color(hex: colorHex, opacity: colorScheme == .light ? 0.14 : 0.20),
+                radius: colorScheme == .light ? 5 : 3,
+                x: 0,
+                y: colorScheme == .light ? 2 : 1
+            )
+    }
+}
+
+private struct CourseScheduleSlotGroup: Identifiable {
+    private struct GroupKey: Hashable {
+        let day: Int
+        let period: Int
+        let length: Int
+    }
+
+    let schedule: ScheduleInfo
+    let weeks: [Int]
+
+    var id: String {
+        "\(schedule.schedule.day)-\(schedule.schedule.period)-\(schedule.schedule.length)-\(weeks.map(String.init).joined(separator: ","))"
+    }
+
+    var day: Int {
+        schedule.schedule.day
+    }
+
+    var periodIndex: Int {
+        schedule.schedule.periodIndex()
+    }
+
+    var rowSpan: Int {
+        schedule.schedule.length
+    }
+
+    var weekdayText: String {
+        Self.weekdayTitle(for: day)
+    }
+
+    var periodText: String {
+        let start = schedule.schedule.start().id + 1
+        let finish = schedule.schedule.finish().id + 1
+        return start == finish ? "第\(start)节" : "第\(start)-\(finish)节"
+    }
+
+    var weekSummary: String {
+        Self.weekSummary(for: weeks, includePrefix: true)
+    }
+
+    var shortWeekSummary: String {
+        Self.weekSummary(for: weeks, includePrefix: false)
+    }
+
+    static func makeGroups(from schedules: [ScheduleInfo]) -> [CourseScheduleSlotGroup] {
+        let grouped = Dictionary(grouping: schedules) { scheduleInfo in
+            GroupKey(
+                day: scheduleInfo.schedule.day,
+                period: scheduleInfo.schedule.period,
+                length: scheduleInfo.schedule.length
+            )
+        }
+
+        return grouped.values.compactMap { values in
+            guard let first = values.first else {
+                return nil
+            }
+
+            let weeks = Array(Set(values.map(\.schedule.week))).sorted()
+            return CourseScheduleSlotGroup(schedule: first, weeks: weeks)
+        }
+        .sorted { lhs, rhs in
+            if lhs.day != rhs.day {
+                return lhs.day < rhs.day
+            }
+
+            if lhs.periodIndex != rhs.periodIndex {
+                return lhs.periodIndex < rhs.periodIndex
+            }
+
+            return lhs.rowSpan < rhs.rowSpan
+        }
+    }
+
+    static func weekdayTitle(for day: Int) -> String {
+        ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][min(max(day, 0), 6)]
+    }
+
+    static func weekSummary(for weeks: [Int], includePrefix: Bool) -> String {
+        let normalizedWeeks = Array(Set(weeks)).sorted()
+        guard let firstWeek = normalizedWeeks.first else {
+            return includePrefix ? "暂无周次信息" : "暂无周次"
+        }
+
+        if normalizedWeeks.count >= 2,
+           zip(normalizedWeeks, normalizedWeeks.dropFirst()).allSatisfy({ current, next in
+               next - current == 2
+           }) {
+            let displayStart = String(firstWeek.advanced(by: 1))
+            let displayEnd = String((normalizedWeeks.last ?? firstWeek).advanced(by: 1))
+            let paritySuffix = firstWeek.isMultiple(of: 2) ? "单周" : "双周"
+            let prefix = includePrefix ? "第" : ""
+            return "\(prefix)\(displayStart)-\(displayEnd)周\(paritySuffix)"
+        }
+
+        var ranges: [(Int, Int)] = []
+        var rangeStart = firstWeek
+        var previousWeek = firstWeek
+
+        for week in normalizedWeeks.dropFirst() {
+            if week == previousWeek + 1 {
+                previousWeek = week
+                continue
+            }
+
+            ranges.append((rangeStart, previousWeek))
+            rangeStart = week
+            previousWeek = week
+        }
+
+        ranges.append((rangeStart, previousWeek))
+
+        let rangeText = ranges.map { start, end in
+            let displayStart = String(start.advanced(by: 1))
+            let displayEnd = String(end.advanced(by: 1))
+            return start == end ? displayStart : [displayStart, displayEnd].joined(separator: "-")
+        }.joined(separator: "、")
+
+        return includePrefix ? "第\(rangeText)周" : "\(rangeText)周"
     }
 }
 

@@ -1612,7 +1612,7 @@ struct PanoramaScreen: View {
             hotspotDismissTask?.cancel()
             guideDismissTask?.cancel()
         }
-        .onChange(of: showGuide) { showGuide in
+        .onChange(of: showGuide) { _, showGuide in
             if showGuide {
                 scheduleGuideAutoDismiss()
             } else {
