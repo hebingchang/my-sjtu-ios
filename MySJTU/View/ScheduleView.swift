@@ -11,7 +11,27 @@ import WidgetKit
 import UIKit
 
 let weekModeLeading: CGFloat = 48
-let timeSlotHeight: CGFloat = 64
+
+private enum ScheduleGridMetrics {
+    static let weekSlotHeightPhone: CGFloat = 64
+    static let weekSlotHeightPad: CGFloat = 72
+    static let dayHourSpacingPhone: CGFloat = 20
+    static let dayHourSpacingPad: CGFloat = 26
+    static let dayHourHeightPhone: CGFloat = 20
+    static let dayHourHeightPad: CGFloat = 26
+
+    static func weekSlotHeight(isPad: Bool) -> CGFloat {
+        isPad ? weekSlotHeightPad : weekSlotHeightPhone
+    }
+
+    static func dayHourSpacing(isPad: Bool) -> CGFloat {
+        isPad ? dayHourSpacingPad : dayHourSpacingPhone
+    }
+
+    static func dayHourHeight(isPad: Bool) -> CGFloat {
+        isPad ? dayHourHeightPad : dayHourHeightPhone
+    }
+}
 
 private func scheduleGridDividerColor(hasCustomBackgroundImage: Bool) -> Color {
     Color(hasCustomBackgroundImage ? UIColor.systemGray4 : UIColor.systemGray5)
@@ -90,6 +110,9 @@ enum ImportError: Error {
 }
 
 struct ScheduleViewTitle: View {
+    private let toolbarButtonSize: CGFloat = 48
+    private let titleRowMinHeight: CGFloat = 52
+
     @Binding var displayMode: DisplayMode
     @EnvironmentObject var progressor: Progressor
     @EnvironmentObject private var appConfig: AppConfig
@@ -160,15 +183,17 @@ struct ScheduleViewTitle: View {
             .font(.system(size: 24, design: .rounded))
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(highlighted ? Color("AccentColor") : Color(UIColor.label))
-            .frame(width: 48, height: 48)
+            .frame(width: toolbarButtonSize, height: toolbarButtonSize)
     }
 
     @Namespace private var namespace
 
     var body: some View {
-        HStack {
+        HStack(spacing: 16) {
             Text(selectedDay.localeMonth())
                 .font(.largeTitle.bold())
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
 
             Spacer()
 
@@ -221,8 +246,10 @@ struct ScheduleViewTitle: View {
                         importAlertMessage(for: detail)
                     }
                 }
+                .frame(height: toolbarButtonSize)
             }
         }
+        .frame(minHeight: titleRowMinHeight, alignment: .center)
     }
 
     @ViewBuilder
@@ -570,6 +597,7 @@ struct DayView: View {
     @Query<CustomSchedulesRequest> private var customSchedules: [CustomSchedule]
     @Environment(\.colorScheme) var colorScheme: ColorScheme
     @AppStorage("schedule.backgroundImage") private var backgroundImage: URL?
+    @AppStorage("schedule.backgroundImage.landscape") private var landscapeBackgroundImage: URL?
     @State private var nowPosition: CGFloat?
     @State private var expandedOverlapGroupID: String?
     // Minute-level refresh is enough for the current-time indicator.
@@ -626,7 +654,19 @@ struct DayView: View {
     }
 
     private var hasCustomBackgroundImage: Bool {
-        backgroundImage != nil
+        backgroundImage != nil || landscapeBackgroundImage != nil
+    }
+
+    private var isPadDevice: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    private var hourSpacing: CGFloat {
+        ScheduleGridMetrics.dayHourSpacing(isPad: isPadDevice)
+    }
+
+    private var hourHeight: CGFloat {
+        ScheduleGridMetrics.dayHourHeight(isPad: isPadDevice)
     }
 
     private var hourGridDividerColor: Color {
@@ -641,12 +681,14 @@ struct DayView: View {
     private struct HourAxisView: View {
         let start: Int
         let finish: Int
+        let hourSpacing: CGFloat
+        let hourHeight: CGFloat
 
         var body: some View {
-            VStack(alignment: .trailing, spacing: DayView.Layout.hourSpacing) {
+            VStack(alignment: .trailing, spacing: hourSpacing) {
                 ForEach(start...finish, id: \.self) { hour in
                     Text("\(hour):00")
-                        .frame(height: DayView.Layout.hourHeight)
+                        .frame(height: hourHeight)
                         .font(.system(size: DayView.Layout.hourFontSize, weight: .medium))
                         .foregroundColor(Color(UIColor.secondaryLabel))
                 }
@@ -659,17 +701,19 @@ struct DayView: View {
         let finish: Int
         let containerHeight: CGFloat
         let dividerColor: Color
+        let hourSpacing: CGFloat
+        let hourHeight: CGFloat
 
         var body: some View {
             ZStack {
-                VStack(alignment: .trailing, spacing: DayView.Layout.hourSpacing) {
+                VStack(alignment: .trailing, spacing: hourSpacing) {
                     ForEach(start...finish, id: \.self) { _ in
                         VStack {
                             Rectangle()
                                 .fill(dividerColor)
                                 .frame(height: DayView.Layout.dividerThickness)
                         }
-                        .frame(height: DayView.Layout.hourHeight)
+                        .frame(height: hourHeight)
                     }
                 }
 
@@ -678,7 +722,7 @@ struct DayView: View {
                     .frame(width: DayView.Layout.dividerThickness, height: containerHeight)
                     .position(
                         x: DayView.Layout.verticalDividerOffset,
-                        y: (DayView.Layout.hourHeight + DayView.Layout.dividerThickness + containerHeight) / 2
+                        y: (hourHeight + DayView.Layout.dividerThickness + containerHeight) / 2
                     )
             }
         }
@@ -692,6 +736,9 @@ struct DayView: View {
         var isFocused: Bool = false
         var isDimmed: Bool = false
         @ViewBuilder let content: () -> Content
+        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+        private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
         private var backgroundColor: Color {
             colorScheme == .light
@@ -703,20 +750,22 @@ struct DayView: View {
             Color(hex: colorHex, opacity: colorScheme == .light ? 0.92 : 0.82)
         }
 
+        private var cornerRadius: CGFloat { isRegularWidth ? 20 : DayView.Layout.eventCardCornerRadius }
+
         var body: some View {
-            let cardShape = RoundedRectangle(cornerRadius: DayView.Layout.eventCardCornerRadius, style: .continuous)
+            let cardShape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             let accentOpacityBoost = isFocused ? 1.12 : 1
             let primaryShadowColor = Color(
                 hex: colorHex,
                 opacity: colorScheme == .light
-                ? (isFocused ? 0.26 : 0.18)
-                : (isFocused ? 0.32 : 0.24)
+                ? (isFocused ? 0.18 : 0.1)
+                : (isFocused ? 0.24 : 0.16)
             )
             let ambientShadowColor = Color(
                 hex: colorHex,
                 opacity: colorScheme == .light
-                ? (isFocused ? 0.12 : 0)
-                : (isFocused ? 0.14 : 0)
+                ? (isFocused ? 0.06 : 0)
+                : (isFocused ? 0.08 : 0)
             )
 
             cardShape
@@ -745,15 +794,15 @@ struct DayView: View {
                 .clipShape(cardShape)
                 .shadow(
                     color: primaryShadowColor,
-                    radius: colorScheme == .light ? (isFocused ? 18 : 10) : (isFocused ? 14 : 8),
+                    radius: colorScheme == .light ? (isFocused ? 14 : 7) : (isFocused ? 10 : 6),
                     x: 0,
-                    y: colorScheme == .light ? (isFocused ? 12 : 5) : (isFocused ? 8 : 3)
+                    y: colorScheme == .light ? (isFocused ? 8 : 3) : (isFocused ? 6 : 2)
                 )
                 .shadow(
                     color: ambientShadowColor,
-                    radius: isSeparated ? 10 : 0,
+                    radius: isSeparated ? 7 : 0,
                     x: 0,
-                    y: isSeparated ? 2 : 0
+                    y: isSeparated ? 1 : 0
                 )
                 .overlay(alignment: .topLeading) {
                     content()
@@ -852,21 +901,52 @@ struct DayView: View {
         let colorScheme: ColorScheme
         let isCompact: Bool
         let showsOverlapIndicator: Bool
+        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+        private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
         private var accentColor: Color {
             Color(hex: colorHex, opacity: colorScheme == .light ? 0.9 : 0.78)
         }
 
+        private var titleFont: Font {
+            if isRegularWidth {
+                return isCompact ? .headline.weight(.semibold) : .title3.weight(.semibold)
+            }
+            return isCompact ? .subheadline.weight(.semibold) : .headline.weight(.semibold)
+        }
+
+        private var detailFont: Font {
+            isRegularWidth ? .subheadline.weight(.medium) : .footnote.weight(.medium)
+        }
+
+        private var capsuleWidth: CGFloat {
+            if isRegularWidth {
+                return isCompact ? 4 : 5
+            }
+            return isCompact ? 3 : 4
+        }
+
+        private var hStackSpacing: CGFloat { isRegularWidth ? 14 : 10 }
+        private var vStackSpacing: CGFloat { isRegularWidth ? (isCompact ? 4 : 10) : (isCompact ? 2 : 8) }
+        private var horizontalPadding: CGFloat { isRegularWidth ? 18 : DayView.Layout.eventCardHorizontalPadding }
+        private var verticalPadding: CGFloat {
+            if isRegularWidth {
+                return isCompact ? 10 : 14
+            }
+            return isCompact ? DayView.Layout.eventCardCompactVerticalPadding : DayView.Layout.eventCardVerticalPadding
+        }
+
         var body: some View {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: hStackSpacing) {
                 Capsule()
                     .fill(accentColor)
-                    .frame(width: isCompact ? 3 : 4)
+                    .frame(width: capsuleWidth)
                     .padding(.vertical, isCompact ? 4 : 2)
 
-                VStack(alignment: .leading, spacing: isCompact ? 2 : 8) {
+                VStack(alignment: .leading, spacing: vStackSpacing) {
                     Text(title)
-                        .font(isCompact ? .subheadline.weight(.semibold) : .headline.weight(.semibold))
+                        .font(titleFont)
                         .fontDesign(.rounded)
                         .foregroundStyle(Color.primary)
                         .lineLimit(isCompact ? 1 : 2)
@@ -874,7 +954,7 @@ struct DayView: View {
 
                     if !isCompact {
                         Text(detail)
-                            .font(.footnote.weight(.medium))
+                            .font(detailFont)
                             .fontDesign(.rounded)
                             .foregroundStyle(Color.secondary)
                             .lineLimit(2)
@@ -884,8 +964,8 @@ struct DayView: View {
                 .padding(.trailing, showsOverlapIndicator ? (isCompact ? 18 : 24) : 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, DayView.Layout.eventCardHorizontalPadding)
-            .padding(.vertical, isCompact ? DayView.Layout.eventCardCompactVerticalPadding : DayView.Layout.eventCardVerticalPadding)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
@@ -1229,14 +1309,14 @@ struct DayView: View {
     }
 
     @ViewBuilder
-    private func nowTimeIndicator(containerHeight: CGFloat, nowPosition: CGFloat) -> some View {
+    private func nowTimeIndicator(containerHeight: CGFloat, nowPosition: CGFloat, hourHeight: CGFloat) -> some View {
         GeometryReader { geometry in
             Divider()
                 .frame(height: Layout.dividerThickness)
                 .background(Color(UIColor.red))
                 .position(
                     x: geometry.size.width / 2,
-                    y: containerHeight * nowPosition + (Layout.dividerThickness + Layout.hourHeight) / 2
+                    y: containerHeight * nowPosition + (Layout.dividerThickness + hourHeight) / 2
                 )
                 .zIndex(1)
 
@@ -1248,7 +1328,7 @@ struct DayView: View {
                 .cornerRadius(4)
                 .position(
                     x: -18,
-                    y: containerHeight * nowPosition + (Layout.dividerThickness + Layout.hourHeight) / 2
+                    y: containerHeight * nowPosition + (Layout.dividerThickness + hourHeight) / 2
                 )
         }
     }
@@ -1279,9 +1359,11 @@ struct DayView: View {
         HStack(spacing: 8) {
             let timeTable = CollegeTimeTable[colleges.first!, default: []]
             let (start, finish) = timeTable.getHours()
-            let containerHeight = (Layout.hourSpacing + Layout.hourHeight) * CGFloat(finish - start)
+            let hourSpacing = self.hourSpacing
+            let hourHeight = self.hourHeight
+            let containerHeight = (hourSpacing + hourHeight) * CGFloat(finish - start)
 
-            HourAxisView(start: start, finish: finish)
+            HourAxisView(start: start, finish: finish, hourSpacing: hourSpacing, hourHeight: hourHeight)
                 .padding([.top, .bottom], Layout.axisVerticalPadding)
 
             ZStack {
@@ -1289,7 +1371,9 @@ struct DayView: View {
                     start: start,
                     finish: finish,
                     containerHeight: containerHeight,
-                    dividerColor: hourGridDividerColor
+                    dividerColor: hourGridDividerColor,
+                    hourSpacing: hourSpacing,
+                    hourHeight: hourHeight
                 )
 
                 if expandedOverlapGroupID != nil {
@@ -1309,7 +1393,7 @@ struct DayView: View {
                 .frame(height: containerHeight)
 
                 if let nowPosition {
-                    nowTimeIndicator(containerHeight: containerHeight, nowPosition: nowPosition)
+                    nowTimeIndicator(containerHeight: containerHeight, nowPosition: nowPosition, hourHeight: hourHeight)
                         .zIndex(20_000)
                 }
             }
@@ -1340,6 +1424,14 @@ struct DayView: View {
 struct WeekScheduleTimeSlots: View {
     let college: College
 
+    private var isPadDevice: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    private var slotHeight: CGFloat {
+        ScheduleGridMetrics.weekSlotHeight(isPad: isPadDevice)
+    }
+
     var body: some View {
         let timeSlots = CollegeTimeTable[college]!
 
@@ -1367,7 +1459,7 @@ struct WeekScheduleTimeSlots: View {
                     }
                 }
                 .padding(4)
-                .frame(height: timeSlotHeight)
+                .frame(height: slotHeight)
             }
         }
     }
@@ -1391,7 +1483,9 @@ struct WeekScheduleView: View {
     @Query<SchedulesRequest> private var schedules: [ScheduleInfo]
     @Query<CustomSchedulesRequest> private var customSchedules: [CustomSchedule]
     @Environment(\.colorScheme) var colorScheme: ColorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("schedule.backgroundImage") private var backgroundImage: URL?
+    @AppStorage("schedule.backgroundImage.landscape") private var landscapeBackgroundImage: URL?
 
     init(day: Date, colleges: [College], onScheduleTouch: @escaping (ScheduleInfo) -> Void, onCustomScheduleTouch: @escaping (CustomSchedule) -> Void) {
         self.day = day
@@ -1402,10 +1496,29 @@ struct WeekScheduleView: View {
         _customSchedules = Query(constant: CustomSchedulesRequest(colleges: colleges, date: day, isWeek: true))
     }
 
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var isPadDevice: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    private var slotHeight: CGFloat {
+        ScheduleGridMetrics.weekSlotHeight(isPad: isPadDevice)
+    }
+
+    private var cardCornerRadius: CGFloat { isRegularWidth ? 14 : 12 }
+    private var cardHorizontalPadding: CGFloat { isRegularWidth ? 8 : 4 }
+    private var cardVerticalPadding: CGFloat { isRegularWidth ? 6 : 4 }
+    private var cardOuterPadding: CGFloat { isRegularWidth ? 3 : 2 }
+    private var cardTitleFont: Font { isRegularWidth ? .callout.weight(.medium) : .caption.weight(.medium) }
+    private var cardSubtitleFont: Font { isRegularWidth ? .footnote : .caption2 }
+
     private let dividerThickness: CGFloat = 1
 
     private var hasCustomBackgroundImage: Bool {
-        backgroundImage != nil
+        backgroundImage != nil || landscapeBackgroundImage != nil
     }
 
     private var gridDividerColor: Color {
@@ -1446,11 +1559,11 @@ struct WeekScheduleView: View {
     }
 
     private func cardHeight(length: Int) -> CGFloat {
-        CGFloat(length) * timeSlotHeight + CGFloat(length - 1) * dividerThickness - 4
+        CGFloat(length) * slotHeight + CGFloat(length - 1) * dividerThickness - 4
     }
 
     private func cardYPosition(periodIndex: Int) -> CGFloat {
-        CGFloat(periodIndex) * timeSlotHeight + max(0, CGFloat(periodIndex) - 1) * dividerThickness
+        CGFloat(periodIndex) * slotHeight + max(0, CGFloat(periodIndex) - 1) * dividerThickness
     }
 
     @ViewBuilder
@@ -1462,7 +1575,7 @@ struct WeekScheduleView: View {
                     .frame(height: dividerThickness)
                     .position(
                         x: geometry.size.width / 2,
-                        y: CGFloat(id) * timeSlotHeight + (CGFloat(id) - 1) * dividerThickness + dividerThickness / 2
+                        y: CGFloat(id) * slotHeight + (CGFloat(id) - 1) * dividerThickness + dividerThickness / 2
                     )
             }
         }
@@ -1568,23 +1681,22 @@ struct WeekScheduleView: View {
     }
 
     private func weekItemPreview(title: String, subtitle: String, colorHex: String) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
 
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: isRegularWidth ? 8 : 6) {
             Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
+                .font(cardTitleFont)
                 .foregroundStyle(Color.primary)
                 .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
             Text(subtitle)
-                .font(.caption2)
+                .font(cardSubtitleFont)
                 .foregroundStyle(Color.secondary)
                 .lineLimit(2)
                 .truncationMode(.tail)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, isRegularWidth ? 14 : 12)
+        .padding(.vertical, isRegularWidth ? 11 : 9)
         .background {
             shape
                 .fill(colorScheme == .light ? Color(UIColor.systemBackground) : Color(UIColor.secondarySystemBackground))
@@ -1623,9 +1735,7 @@ struct WeekScheduleView: View {
         @ViewBuilder contextMenu: @escaping () -> MenuContent
     ) -> some View {
         GeometryReader { geometry in
-            let cardShape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-            let horizontalPadding: CGFloat = 4
-            let verticalPadding: CGFloat = 4
+            let cardShape = RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
 
             cardShape
                 .fill(colorScheme == .light ? Color(UIColor.systemBackground) : Color(UIColor.secondarySystemBackground))
@@ -1659,18 +1769,17 @@ struct WeekScheduleView: View {
                 .overlay(alignment: .topLeading) {
                     VStack(alignment: .leading) {
                         Text(title)
-                            .font(.caption)
-                            .fontWeight(.medium)
+                            .font(cardTitleFont)
                             .foregroundStyle(Color.primary)
                             .truncationMode(.tail)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                             .layoutPriority(1)
-                        
+
                         Spacer()
 
                         Text(subtitle)
-                            .font(.caption2)
+                            .font(cardSubtitleFont)
                             .foregroundStyle(Color.secondary)
                             .truncationMode(.tail)
                             .minimumScaleFactor(0.82)
@@ -1680,8 +1789,8 @@ struct WeekScheduleView: View {
                                 alignment: .bottomLeading
                             )
                     }
-                    .padding(.horizontal, horizontalPadding)
-                    .padding(.vertical, verticalPadding)
+                    .padding(.horizontal, cardHorizontalPadding)
+                    .padding(.vertical, cardVerticalPadding)
                 }
                 .clipShape(cardShape)
                 .contentShape(cardShape)
@@ -1697,7 +1806,7 @@ struct WeekScheduleView: View {
                     onTap()
                 }
         }
-        .padding(2)
+        .padding(cardOuterPadding)
     }
 
     var body: some View {
@@ -1913,11 +2022,18 @@ struct ScheduleView: View {
     @AppStorage("schedule.backgroundImage.transparency") var backgroundImageTransparency: Double = ScheduleBackgroundEffectConfiguration.defaultTransparency
     @AppStorage("schedule.backgroundImage.blurRadius") var backgroundImageBlurRadius: Double = ScheduleBackgroundEffectConfiguration.defaultBlurRadius
     @AppStorage("schedule.backgroundImage.parallaxEnabled") var backgroundImageParallaxEnabled: Bool = ScheduleBackgroundEffectConfiguration.defaultParallaxEnabled
+    @AppStorage("schedule.backgroundImage.landscape") var landscapeBackgroundImage: URL?
+    @AppStorage("schedule.backgroundImage.landscape.transparency") var landscapeBackgroundImageTransparency: Double = ScheduleBackgroundEffectConfiguration.defaultTransparency
+    @AppStorage("schedule.backgroundImage.landscape.blurRadius") var landscapeBackgroundImageBlurRadius: Double = ScheduleBackgroundEffectConfiguration.defaultBlurRadius
+    @AppStorage("schedule.backgroundImage.landscape.parallaxEnabled") var landscapeBackgroundImageParallaxEnabled: Bool = ScheduleBackgroundEffectConfiguration.defaultParallaxEnabled
     @AppStorage("settings.schedule.auto_hide_week_label_overlay") var autoHideWeekLabelOverlay: Bool = true
     @State private var isWeekLabelOverlayVisible = true
     @State private var titleSectionHeight: CGFloat = 0
     @State private var cachedBackgroundImage: UIImage?
     @State private var cachedBackgroundImagePath: String?
+    @State private var cachedLandscapeBackgroundImage: UIImage?
+    @State private var cachedLandscapeBackgroundImagePath: String?
+    @State private var isLandscape = false
     @State private var currentVerticalScrollMetrics: ScheduleVerticalScrollMetrics = .zero
     @State private var interactionCache = InteractionCache()
 
@@ -1937,15 +2053,40 @@ struct ScheduleView: View {
         { activeCustomSchedule = $0 }
     }
 
+    private var isIPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    private var useLandscapeBackground: Bool {
+        isIPad && isLandscape && cachedLandscapeBackgroundImage != nil
+    }
+
+    private var activeBackgroundImage: UIImage? {
+        useLandscapeBackground ? cachedLandscapeBackgroundImage : cachedBackgroundImage
+    }
+
+    private var hasAnyBackgroundImage: Bool {
+        cachedBackgroundImage != nil || (isIPad && cachedLandscapeBackgroundImage != nil)
+    }
+
     private var backgroundEffect: ScheduleBackgroundEffectConfiguration {
-        .init(
+        if useLandscapeBackground {
+            return .init(
+                transparency: landscapeBackgroundImageTransparency,
+                blurRadius: landscapeBackgroundImageBlurRadius
+            )
+        }
+        return .init(
             transparency: backgroundImageTransparency,
             blurRadius: backgroundImageBlurRadius
         )
     }
 
     private var effectiveBackgroundParallaxEnabled: Bool {
-        guard cachedBackgroundImage != nil else { return false }
+        guard activeBackgroundImage != nil else { return false }
+        if useLandscapeBackground {
+            return landscapeBackgroundImageParallaxEnabled
+        }
         return backgroundImageParallaxEnabled
     }
     
@@ -1990,6 +2131,20 @@ struct ScheduleView: View {
 
         let loadedImage = UIImage(contentsOfFile: path)
         cachedBackgroundImage = loadedImage
+    }
+
+    private func refreshCachedLandscapeBackgroundImage(for url: URL?) {
+        let path = url?.path
+        guard cachedLandscapeBackgroundImagePath != path else { return }
+        cachedLandscapeBackgroundImagePath = path
+
+        guard let path else {
+            cachedLandscapeBackgroundImage = nil
+            return
+        }
+
+        let loadedImage = UIImage(contentsOfFile: path)
+        cachedLandscapeBackgroundImage = loadedImage
     }
 
     private func setWeekLabelOverlayVisibility(_ isVisible: Bool) {
@@ -2117,13 +2272,13 @@ struct ScheduleView: View {
 
     @ViewBuilder
     private var scheduleBackground: some View {
-        if let cachedBackgroundImage {
+        if let activeBackgroundImage {
             GeometryReader { geometry in
                 let parallaxOffset = backgroundParallaxOffsetY
                 let canvasPadding = effectiveBackgroundParallaxEnabled ? backgroundParallaxCanvasPadding : 0
 
                 ScheduleBackgroundArtwork(
-                    image: cachedBackgroundImage,
+                    image: activeBackgroundImage,
                     effect: backgroundEffect
                 )
                     .frame(width: geometry.size.width, height: geometry.size.height + canvasPadding * 2)
@@ -2295,11 +2450,11 @@ struct ScheduleView: View {
 
     private var topReadableBackdrop: some View {
         TitleSectionTopBackdrop(
-            useAccentTint: backgroundImage == nil
+            useAccentTint: activeBackgroundImage == nil
         )
         .frame(maxWidth: .infinity)
         .frame(height: max(titleBackdropHeight, 0), alignment: .top)
-        .ignoresSafeArea(edges: .top)
+        .ignoresSafeArea()
         .allowsHitTesting(false)
     }
 
@@ -2378,6 +2533,14 @@ struct ScheduleView: View {
         .animation(.easeInOut(duration: 0.2), value: displayMode)
         .task(id: backgroundImage?.path) {
             refreshCachedBackgroundImage(for: backgroundImage)
+        }
+        .task(id: landscapeBackgroundImage?.path) {
+            refreshCachedLandscapeBackgroundImage(for: landscapeBackgroundImage)
+        }
+        .onGeometryChange(for: Bool.self) { geometry in
+            geometry.size.width > geometry.size.height
+        } action: { _, newValue in
+            isLandscape = newValue
         }
         .onChange(of: selectedDay) {
             interactionCache.overlayGestureReferenceHeight = nil

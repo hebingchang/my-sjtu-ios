@@ -42,6 +42,15 @@ struct CanvasSettingsView: View {
                     Label("复制 Canvas 令牌", systemImage: "document.on.doc")
                 }
                 .disabled(canvasToken == nil)
+                .confirmationDialog("复制 Canvas 令牌", isPresented: $showCopyTokenConfirmation, titleVisibility: .visible) {
+                    Button("复制令牌") {
+                        copyCanvasToken()
+                    }
+                    Button("取消", role: .cancel) {
+                    }
+                } message: {
+                    Text("Canvas 令牌相当于您的账户访问凭证，请不要提供给不受信任的第三方。")
+                }
             } header: {
                 Text("Canvas 令牌")
             } footer: {
@@ -54,15 +63,6 @@ struct CanvasSettingsView: View {
         }
         .navigationTitle("Canvas")
         .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog("复制 Canvas 令牌", isPresented: $showCopyTokenConfirmation, titleVisibility: .visible) {
-            Button("复制令牌") {
-                copyCanvasToken()
-            }
-            Button("取消", role: .cancel) {
-            }
-        } message: {
-            Text("Canvas 令牌相当于您的账户访问凭证，请不要提供给不受信任的第三方。")
-        }
         .alert("已复制 Canvas 令牌", isPresented: $showCopySuccessAlert) {
             Button("知道了", role: .cancel) {
             }
@@ -93,6 +93,8 @@ struct CanvasCourseMatchingSettingsView: View {
     @State private var saveErrorMessage: String?
     @State private var showSaveError = false
     @State private var savingCourseIDs: Set<String> = []
+    @State private var showTokenExpiredAlert: Bool = false
+    @State private var presentAccountPage: Bool = false
 
     private var canvasToken: String? {
         accounts.jaccountCanvasToken
@@ -182,6 +184,21 @@ struct CanvasCourseMatchingSettingsView: View {
                 await autoMatchDisplayedCoursesIfNeeded()
             }
         }
+        .sheet(isPresented: $presentAccountPage) {
+            NavigationStack {
+                AccountView(provider: .jaccount)
+                    .navigationTitle("jAccount 账户")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .alert("Canvas 错误", isPresented: $showTokenExpiredAlert) {
+            Button("以后", role: .cancel) { }
+            Button("前往设置") {
+                presentAccountPage = true
+            }
+        } message: {
+            Text("无法访问 Canvas，可能是令牌已被删除或重置，请重新启用 Canvas 账户")
+        }
         .alert("无法保存课程匹配", isPresented: $showSaveError) {
             Button("知道了", role: .cancel) { }
         } message: {
@@ -229,6 +246,7 @@ struct CanvasCourseMatchingSettingsView: View {
             self.localCourses = didAutoMatch ? try await fetchLocalCourses() : localCourses
         } catch ResponseCodeInterceptor.ResponseCodeError.invalidResponseCode {
             loadErrorMessage = "Canvas 令牌可能已失效，请前往账户设置重新启用 Canvas。"
+            showTokenExpiredAlert = true
         } catch APIError.noAccount {
             loadErrorMessage = "未找到可用的 Canvas 账户，请先在设置中启用 Canvas。"
         } catch EloquentError.dbNotOpened {

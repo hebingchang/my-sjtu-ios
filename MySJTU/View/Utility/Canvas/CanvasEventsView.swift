@@ -17,6 +17,8 @@ struct CanvasEventsView: View {
     @State private var isLoading: Bool = false
     @State private var hasLoadedOnce: Bool = false
     @State private var loadErrorMessage: String?
+    @State private var showTokenExpiredAlert: Bool = false
+    @State private var presentAccountPage: Bool = false
 
     private var canvasToken: String? {
         accounts.jaccountCanvasToken
@@ -85,6 +87,21 @@ struct CanvasEventsView: View {
         .animation(.easeInOut, value: isLoading)
         .task {
             await loadAssignments()
+        }
+        .sheet(isPresented: $presentAccountPage) {
+            NavigationStack {
+                AccountView(provider: .jaccount)
+                    .navigationTitle("jAccount 账户")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .alert("Canvas 错误", isPresented: $showTokenExpiredAlert) {
+            Button("以后", role: .cancel) { }
+            Button("前往设置") {
+                presentAccountPage = true
+            }
+        } message: {
+            Text("无法访问 Canvas，可能是令牌已被删除或重置，请重新启用 Canvas 账户")
         }
     }
 
@@ -201,8 +218,12 @@ struct CanvasEventsView: View {
             }
 
             assignments = try await api.getAssignments(assignmentIds: assignmentIDs)
+        } catch APIError.sessionExpired {
+            loadErrorMessage = "Canvas 令牌可能已失效，请在账户设置中重新启用。"
+            showTokenExpiredAlert = true
         } catch ResponseCodeInterceptor.ResponseCodeError.invalidResponseCode {
             loadErrorMessage = "Canvas 令牌可能已失效，请在账户设置中重新启用。"
+            showTokenExpiredAlert = true
         } catch {
             loadErrorMessage = "无法加载待办事项列表，请稍后重试。"
         }

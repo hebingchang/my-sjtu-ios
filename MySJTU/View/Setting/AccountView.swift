@@ -459,6 +459,7 @@ struct AccountView: View {
     @State private var showCanvasTokenAlert = false
     @State private var isShowingCanvasLink = false
     @State private var isShowingDeleteCanvasToken = false
+    @State private var isShowingManualTokenInput = false
     @State private var pendingCanvasEnablePreviousValue: Bool?
     @Environment(\.dismiss) private var dismiss
 
@@ -512,6 +513,13 @@ struct AccountView: View {
                 CanvasLinkView(provider: provider)
                     .navigationTitle("连接 Canvas 账户")
                     .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(isPresented: $isShowingManualTokenInput) {
+            NavigationStack {
+                CanvasManualTokenInputView { token in
+                    try await importCanvasTokenManually(token, for: account)
+                }
             }
         }
         .alert("错误", isPresented: $presentError, presenting: featureError) { _ in
@@ -699,6 +707,9 @@ struct AccountView: View {
         if canvasStatus == .tokenExpired {
             Button("重新生成令牌") {
                 regenerateCanvasToken(for: account)
+            }
+            Button("手动输入令牌") {
+                isShowingManualTokenInput = true
             }
             Button("关闭 Canvas 功能") {
                 removeCanvasFeatureLocally(for: account.provider)
@@ -979,6 +990,21 @@ struct AccountView: View {
 
         featureLoading[.canvas] = false
         showCanvasTokenAlert = true
+    }
+
+    @MainActor
+    private func importCanvasTokenManually(_ token: String, for account: WebAuthAccount) async throws {
+        guard let index = accountIndex(for: account.provider) else {
+            throw APIError.noAccount
+        }
+
+        let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        try await checkCanvasToken(token: trimmedToken)
+        accounts[index].bizData["canvas_token"] = trimmedToken
+        if !accounts[index].enabledFeatures.contains(.canvas) {
+            accounts[index].enabledFeatures.append(.canvas)
+        }
+        NSUbiquitousKeyValueStore.default.set(trimmedToken, forKey: canvasTokenStoreKey(for: account))
     }
 
     private func regenerateCanvasToken(for account: WebAuthAccount) {

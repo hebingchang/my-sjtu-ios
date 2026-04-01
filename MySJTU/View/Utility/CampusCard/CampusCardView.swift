@@ -280,6 +280,8 @@ struct CardChargeView: View {
 }
 
 struct CampusCardView: View {
+    private let cardPreviewMaxWidth: CGFloat = 360
+
     @Binding var campusCard: CampusCard
     let timer = Timer.publish(every: 5, on: .main, in: .common)
 
@@ -400,7 +402,7 @@ struct CampusCardView: View {
             Image(uiImage: UIImage(named: cardCover)!)
                 .resizable()
                 .scaledToFit()
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: cardPreviewMaxWidth)
                 .listRowInsets(EdgeInsets())
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
@@ -452,12 +454,14 @@ struct CampusCardView: View {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(.gray.opacity(0.2))
                 }
+                .frame(maxWidth: .infinity)
                 .onAppear {
                         showCardTitle = false
                 }
                 .onDisappear {
                         showCardTitle = true
                 }
+                .listRowBackground(Color.clear)
             
             Section {
                 HStack {

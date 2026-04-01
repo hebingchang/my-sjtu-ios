@@ -7,6 +7,98 @@ import SwiftUI
 import MapKit
 import UIKit
 
+struct BusSidebarPresentation {
+    let station: Binding<BusAPI.Station?>
+    let lineDetail: Binding<BusLineDetailSelection?>
+    let showRoot: () -> Void
+    let showStation: (BusAPI.Station) -> Void
+    let showLineDetail: (BusLineDetailSelection) -> Void
+}
+
+struct BusSidebarRootView: View {
+    var body: some View {
+        ContentUnavailableView(
+            "在地图上选择站点",
+            systemImage: "mappin.and.ellipse",
+            description: Text("点按右侧地图上的站点后，这里会显示对应发车信息与线路详情。")
+        )
+        .navigationTitle("校园巴士")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct BusSidebarStationNavigationView: View {
+    let station: BusAPI.Station
+    @ObservedObject var viewModel: BusMapViewModel
+    let onSelectLineDetail: (BusLineDetailSelection) -> Void
+
+    var body: some View {
+        BusStationSheetContent(
+            station: station,
+            state: viewModel.panelState(for: station),
+            onRefresh: {
+                viewModel.loadPanel(for: station, forceRefresh: true)
+            },
+            onSelectLineDetail: onSelectLineDetail
+        )
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                BusSheetNavigationTitle(
+                    title: station.name,
+                    subtitle: nil
+                )
+            }
+        }
+        .task(id: station.id) {
+            viewModel.loadPanel(for: station)
+        }
+    }
+}
+
+struct BusSidebarLineDetailNavigationView: View {
+    let selection: BusLineDetailSelection
+    @ObservedObject var viewModel: BusMapViewModel
+    let onSelectDirectionFilter: (BusLineDirectionFilterMode) -> Void
+
+    private var taskID: String {
+        [
+            selection.id,
+            selection.destinationCode,
+            selection.directionFilterMode.rawValue
+        ]
+        .joined(separator: "|")
+    }
+
+    var body: some View {
+        BusLineDetailSheetContent(
+            selection: selection,
+            state: viewModel.lineDetailState(for: selection),
+            onRefresh: {
+                Task {
+                    _ = await viewModel.loadLineDetail(
+                        for: selection,
+                        forceRefresh: true
+                    )
+                }
+            },
+            onSelectDirectionFilter: onSelectDirectionFilter
+        )
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                BusSheetNavigationTitle(
+                    title: selection.lineName,
+                    subtitle: selection.sheetSubtitle
+                )
+            }
+        }
+        .task(id: taskID) {
+            _ = await viewModel.loadLineDetail(for: selection)
+        }
+    }
+}
+
 struct BusListView: View {
     private struct StationAnnotationVisibility {
         let showsMarker: Bool
@@ -46,7 +138,8 @@ struct BusListView: View {
     private static let initialCameraAnimation: Animation = .smooth(duration: 0.6)
     private static let lineDetailSheetDetents: Set<PresentationDetent> = [.height(232), .medium, .large]
 
-    @StateObject private var viewModel = BusMapViewModel()
+    private let sidebarPresentation: BusSidebarPresentation?
+    @StateObject private var viewModel: BusMapViewModel
     @Namespace private var mapScope
     @State private var cameraPosition: MapCameraPosition = .region(Self.defaultMapRegion)
     @State private var visibleRegion: MKCoordinateRegion? = Self.defaultMapRegion
@@ -65,7 +158,36 @@ struct BusListView: View {
     @State private var lineDetailLoadTask: Task<Void, Never>?
     @Environment(\.dismiss) private var dismiss
 
+    init(
+        sidebarPresentation: BusSidebarPresentation? = nil,
+        viewModel: BusMapViewModel? = nil
+    ) {
+        self.sidebarPresentation = sidebarPresentation
+        _viewModel = StateObject(wrappedValue: viewModel ?? BusMapViewModel())
+    }
+
     // MARK: - Layout State
+
+    private var usesSidebarNavigation: Bool {
+        sidebarPresentation != nil
+    }
+
+    private var sidebarStationID: Int? {
+        sidebarPresentation?.station.wrappedValue?.id
+    }
+
+    private var sidebarLineDetailToken: String? {
+        guard let selection = sidebarPresentation?.lineDetail.wrappedValue else {
+            return nil
+        }
+
+        return [
+            selection.id,
+            selection.destinationCode,
+            selection.directionFilterMode.rawValue
+        ]
+        .joined(separator: "|")
+    }
 
     private var shouldShowStationLabels: Bool {
         (visibleRegion?.span.longitudeDelta ?? Self.defaultMapRegion.span.longitudeDelta)
@@ -103,6 +225,7 @@ struct BusListView: View {
     private var currentMapCenterDownwardCompensationFraction: CLLocationDegrees {
         let mapHeight = max(mapViewFrame.height, mapViewSize.height)
         guard
+            !usesSidebarNavigation,
             mapHeight > 0,
             presentedLineDetail != nil,
             selectedLineSheetDetent == .medium
@@ -220,19 +343,22 @@ struct BusListView: View {
         .background(Color.systemGroupedBackground)
         .navigationTitle("校园巴士")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden()
+        .navigationBarBackButtonHidden(!usesSidebarNavigation)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: dismissView) {
-                    HStack(spacing: 2) {
-                        Image(systemName: "chevron.left")
-                        Text("返回")
+            if !usesSidebarNavigation {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: dismissView) {
+                        HStack(spacing: 2) {
+                            Image(systemName: "chevron.left")
+                            Text("返回")
+                        }
                     }
                 }
             }
         }
         .task {
             await viewModel.loadStationsIfNeeded()
+            syncSidebarSelectionIfNeeded()
         }
         .onChange(of: viewModel.stations) { _, stations in
             configureInitialCameraIfNeeded(with: stations)
@@ -240,11 +366,21 @@ struct BusListView: View {
         .onChange(of: mapSelection) { _, selection in
             handleMapSelection(selection)
         }
+        .onChange(of: sidebarStationID) { _, _ in
+            syncSidebarSelectionIfNeeded()
+        }
+        .onChange(of: sidebarLineDetailToken) { _, _ in
+            syncSidebarSelectionIfNeeded()
+        }
         .onDisappear {
             cancelLineDetailTask()
             viewModel.deactivateRealtimeMonitor()
         }
-        .sheet(item: presentedStationBinding) { station in
+        .sheet(
+            item: usesSidebarNavigation
+                ? .constant(nil as BusAPI.Station?)
+                : presentedStationBinding
+        ) { station in
             NavigationStack {
                 BusStationSheetContent(
                     station: station,
@@ -292,7 +428,11 @@ struct BusListView: View {
             .interactiveDismissDisabled()
             .presentationDragIndicator(.visible)
             .presentationBackgroundInteraction(.enabled(upThrough: .medium))
-            .sheet(item: presentedLineDetailBinding) { selection in
+            .sheet(
+                item: usesSidebarNavigation
+                    ? .constant(nil as BusLineDetailSelection?)
+                    : presentedLineDetailBinding
+            ) { selection in
                 NavigationStack {
                     BusLineDetailSheetContent(
                         selection: selection,
@@ -556,6 +696,40 @@ struct BusListView: View {
 
     // MARK: - Presentation
 
+    private func syncSidebarSelectionIfNeeded() {
+        guard let sidebarPresentation else {
+            return
+        }
+
+        if let sidebarLineDetail = sidebarPresentation.lineDetail.wrappedValue {
+            guard presentedLineDetail != sidebarLineDetail else {
+                return
+            }
+
+            presentLineDetail(sidebarLineDetail)
+            return
+        }
+
+        if let sidebarStation = sidebarPresentation.station.wrappedValue {
+            if presentedLineDetail != nil {
+                dismissLineDetail(syncSidebar: false)
+            }
+
+            guard presentedStation?.id != sidebarStation.id else {
+                return
+            }
+
+            selectStation(sidebarStation)
+            return
+        }
+
+        guard presentedStation != nil || presentedLineDetail != nil else {
+            return
+        }
+
+        deselectStation(syncSidebar: false)
+    }
+
     private func selectStation(_ station: BusAPI.Station) {
         if presentedStation?.id == station.id {
             if selectedSheetDetent != .medium {
@@ -575,19 +749,31 @@ struct BusListView: View {
         feedbackGenerator.prepare()
         selectionAnimationToken &+= 1
         feedbackGenerator.impactOccurred(intensity: 0.9)
+
+        if let sidebarPresentation {
+            sidebarPresentation.showStation(station)
+        }
     }
 
     private func deselectStation(
-        restoreLineDetailMap: Bool = true
+        restoreLineDetailMap: Bool = true,
+        syncSidebar: Bool = true
     ) {
         guard presentedStation != nil || presentedLineDetail != nil else {
             return
         }
-        dismissLineDetail(restoreMap: restoreLineDetailMap)
+        dismissLineDetail(
+            restoreMap: restoreLineDetailMap,
+            syncSidebar: false
+        )
         if selectedSheetDetent != Self.compactSheetDetent {
             selectedSheetDetent = Self.compactSheetDetent
         }
         presentedStation = nil
+
+        if syncSidebar, let sidebarPresentation {
+            sidebarPresentation.showRoot()
+        }
     }
 
     private func handleMapSelection(
@@ -633,6 +819,11 @@ struct BusListView: View {
         _ selection: BusLineDetailSelection,
         forceRefresh: Bool = false
     ) {
+        if presentedStation?.id != selection.station.id {
+            presentedStation = selection.station
+            viewModel.loadPanel(for: selection.station)
+        }
+
         if presentedLineDetail == nil {
             routeRestoreRegion = visibleRegion
             ?? (viewModel.stations.isEmpty ? Self.defaultMapRegion : mapRegion(for: viewModel.stations))
@@ -674,6 +865,10 @@ struct BusListView: View {
                 }
             }
         }
+
+        if let sidebarPresentation {
+            sidebarPresentation.showLineDetail(selection)
+        }
     }
 
     private func updatePresentedLineDetailDirectionFilter(
@@ -689,10 +884,14 @@ struct BusListView: View {
         }
 
         presentedLineDetail = updatedSelection
+        if let sidebarPresentation {
+            sidebarPresentation.showLineDetail(updatedSelection)
+        }
     }
 
     private func dismissLineDetail(
-        restoreMap: Bool = true
+        restoreMap: Bool = true,
+        syncSidebar: Bool = true
     ) {
         guard presentedLineDetail != nil || routeRestoreRegion != nil else {
             return
@@ -709,6 +908,14 @@ struct BusListView: View {
 
         let regionToRestore = routeRestoreRegion
         routeRestoreRegion = nil
+
+        if syncSidebar, let sidebarPresentation {
+            if let station = presentedStation {
+                sidebarPresentation.showStation(station)
+            } else {
+                sidebarPresentation.showRoot()
+            }
+        }
 
         guard restoreMap, let regionToRestore else {
             return

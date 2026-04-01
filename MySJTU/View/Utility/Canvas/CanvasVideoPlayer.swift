@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFoundation
+import AVKit
 import MediaPlayer
 import UIKit
 @preconcurrency import VLCKitSPM
@@ -21,7 +22,9 @@ struct CanvasVideoFullscreenPlayerView: View {
     private let scrubPreviewContext: CanvasVideoScrubPreviewContext?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var playback: CanvasVideoPlaybackCoordinator
+    @StateObject private var pictureInPictureController = CanvasVideoPictureInPictureController()
     @State private var scrubPosition: Double = 0
     @State private var isScrubbing: Bool = false
     @State private var scrubRangeUpperBound: Double?
@@ -190,6 +193,14 @@ struct CanvasVideoFullscreenPlayerView: View {
         (chromeVisible || playback.primaryStreamPlayer == nil) ? 1 : 0
     }
 
+    private var pictureInPictureStreamID: Int? {
+        guard playback.primaryStreamPlayer?.avPlayer != nil else {
+            return nil
+        }
+
+        return playback.primaryStreamPlayer?.id
+    }
+
     private var controlsOpacity: Double {
         (chromeVisible && playback.primaryStreamPlayer != nil) ? 1 : 0
     }
@@ -294,8 +305,18 @@ struct CanvasVideoFullscreenPlayerView: View {
         .onDisappear {
             chromeHideTask?.cancel()
             scrubCompletionTask?.cancel()
+            pictureInPictureController.reset()
             playback.stopPlayback(prepareForResume: false)
             CanvasVideoOrientationController.restoreDefaultOrientations()
+        }
+        .onChange(of: scenePhase) { _, newValue in
+            guard newValue == .background else {
+                return
+            }
+
+            pictureInPictureController.startIfNeeded(
+                shouldStartAutomatically: playback.showsPauseButton
+            )
         }
         .onChange(of: playback.currentTime) { _, newValue in
             if !isScrubbing {
@@ -635,7 +656,14 @@ struct CanvasVideoFullscreenPlayerView: View {
         cornerRadius: CGFloat
     ) -> some View {
         ZStack(alignment: .bottomLeading) {
-            CanvasVideoPlayerSurface(streamPlayer: streamPlayer)
+            CanvasVideoPlayerSurface(
+                streamPlayer: streamPlayer,
+                playerLayerObserver: streamPlayer.id == pictureInPictureStreamID
+                    ? { playerLayer in
+                        pictureInPictureController.updateSourcePlayerLayer(playerLayer)
+                    }
+                    : nil
+            )
         }
         .aspectRatio(16 / 9, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -3446,14 +3474,17 @@ private final class CanvasVideoPlaybackCoordinator: ObservableObject {
 
 private struct CanvasVideoPlayerSurface: UIViewRepresentable {
     let streamPlayer: CanvasVideoStreamPlayer
+    let playerLayerObserver: ((AVPlayerLayer?) -> Void)?
 
     func makeUIView(context: Context) -> CanvasVideoPlayerSurfaceView {
         let view = CanvasVideoPlayerSurfaceView()
+        view.playerLayerObserver = playerLayerObserver
         view.bind(to: streamPlayer)
         return view
     }
 
     func updateUIView(_ uiView: CanvasVideoPlayerSurfaceView, context: Context) {
+        uiView.playerLayerObserver = playerLayerObserver
         uiView.bind(to: streamPlayer)
     }
 
@@ -3464,6 +3495,7 @@ private struct CanvasVideoPlayerSurface: UIViewRepresentable {
 
 private final class CanvasVideoPlayerSurfaceView: UIView {
     let playerLayer = AVPlayerLayer()
+    var playerLayerObserver: ((AVPlayerLayer?) -> Void)?
     private weak var boundVLCPlayer: VLCMediaPlayer?
 
     override init(frame: CGRect) {
@@ -3514,12 +3546,19 @@ private final class CanvasVideoPlayerSurfaceView: UIView {
 
             rebindVLCPlayerIfNeeded(force: true, resetDrawable: isSwitchingPlayers)
         }
+
+        notifyPlayerLayerObserver()
     }
 
     func prepareForReuse() {
+        playerLayerObserver?(nil)
         playerLayer.player = nil
         playerLayer.isHidden = false
         unbindVLCPlayerIfNeeded()
+    }
+
+    private func notifyPlayerLayerObserver() {
+        playerLayerObserver?(playerLayer.player == nil ? nil : playerLayer)
     }
 
     private func unbindVLCPlayerIfNeeded() {
@@ -3563,11 +3602,97 @@ private final class CanvasVideoPlayerSurfaceView: UIView {
     }
 }
 
+@MainActor
+private final class CanvasVideoPictureInPictureController: NSObject, ObservableObject {
+    private weak var sourcePlayerLayer: AVPlayerLayer?
+    private var controller: AVPictureInPictureController?
+    private var needsControllerRebuildAfterStop = false
+
+    func updateSourcePlayerLayer(_ playerLayer: AVPlayerLayer?) {
+        let layerChanged = sourcePlayerLayer !== playerLayer
+        sourcePlayerLayer = playerLayer
+
+        guard layerChanged else {
+            if controller == nil, playerLayer != nil {
+                rebuildController()
+            }
+            return
+        }
+
+        if controller?.isPictureInPictureActive == true {
+            needsControllerRebuildAfterStop = true
+            return
+        }
+
+        rebuildController()
+    }
+
+    func startIfNeeded(shouldStartAutomatically: Bool) {
+        guard shouldStartAutomatically,
+              AVPictureInPictureController.isPictureInPictureSupported(),
+              let controller,
+              controller.isPictureInPictureActive == false,
+              controller.isPictureInPicturePossible else {
+            return
+        }
+
+        controller.startPictureInPicture()
+    }
+
+    func reset() {
+        needsControllerRebuildAfterStop = false
+
+        if controller?.isPictureInPictureActive == true {
+            controller?.stopPictureInPicture()
+        }
+
+        controller?.delegate = nil
+        controller = nil
+        sourcePlayerLayer = nil
+    }
+
+    private func rebuildController() {
+        controller?.delegate = nil
+        controller = nil
+        needsControllerRebuildAfterStop = false
+
+        guard AVPictureInPictureController.isPictureInPictureSupported(),
+              let sourcePlayerLayer,
+              sourcePlayerLayer.player != nil else {
+            return
+        }
+
+        guard let controller = AVPictureInPictureController(playerLayer: sourcePlayerLayer) else {
+            return
+        }
+
+        controller.canStartPictureInPictureAutomaticallyFromInline = true
+        controller.delegate = self
+        self.controller = controller
+    }
+}
+
+extension CanvasVideoPictureInPictureController: AVPictureInPictureControllerDelegate {
+    nonisolated func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        Task { @MainActor [weak self] in
+            guard let self, self.needsControllerRebuildAfterStop else {
+                return
+            }
+
+            self.rebuildController()
+        }
+    }
+}
+
 enum CanvasVideoOrientationController {
-    private static let defaultMask: UIInterfaceOrientationMask = [
+    private static let phoneDefaultMask: UIInterfaceOrientationMask = [
         .portrait,
         .portraitUpsideDown
     ]
+
+    private static var defaultMask: UIInterfaceOrientationMask {
+        UIDevice.current.userInterfaceIdiom == .pad ? .all : phoneDefaultMask
+    }
 
     private(set) static var currentMask: UIInterfaceOrientationMask = defaultMask
 

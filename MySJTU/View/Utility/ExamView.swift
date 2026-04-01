@@ -9,6 +9,9 @@ import SwiftUI
 import GRDBQuery
 
 struct ExamView: View {
+    private static let cardRowInsets = EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16)
+    private static let sectionHeaderHorizontalPadding: CGFloat = 4
+
     @State private var loading: Bool = true
     @AppStorage("accounts") var accounts: [WebAuthAccount] = []
     @Query<SemestersRequest> private var availableSemesters: [Semester]
@@ -25,8 +28,7 @@ struct ExamView: View {
         let account = accounts.first {
             $0.provider == .jaccount
         }
-        let horizontalContentPadding: CGFloat = 16
-        
+
         ZStack {
             LinearGradient(
                 colors: [
@@ -65,39 +67,6 @@ struct ExamView: View {
                             result += 1
                         }
                     }
-                    
-                    Section {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                OverviewCard(
-                                    title: "进行中",
-                                    value: "\(ongoing.count)",
-                                    systemImage: "timer",
-                                    tint: .orange
-                                )
-
-                                OverviewCard(
-                                    title: "即将开始",
-                                    value: "\(upcoming.count)",
-                                    systemImage: "calendar.badge.clock",
-                                    tint: .blue
-                                )
-
-                                OverviewCard(
-                                    title: "已出成绩",
-                                    value: "\(grades.count)",
-                                    systemImage: "graduationcap",
-                                    tint: .mint
-                                )
-                            }
-                            .padding(.horizontal, horizontalContentPadding)
-                            .padding(.vertical, 4)
-                        }
-                        .padding(.horizontal, -horizontalContentPadding)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    }
 
                     if ongoing.count > 0 {
                         Section(header: SectionHeaderView(title: "正在进行的考试", subtitle: "\(ongoing.count) 场", systemImage: "timer", tint: .orange)) {
@@ -119,36 +88,7 @@ struct ExamView: View {
                         return grades.first { !shownGrades.contains($0.id) } != nil
                     }
                     
-                    Section(header: HStack(spacing: 10) {
-                        SectionHeaderIcon(systemImage: "graduationcap.fill", tint: .mint)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("成绩")
-                                .font(.headline)
-                            Text("已显示 \(shownGradeCount)/\(grades.count)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if grades.count > 0 {
-                            GradeVisibilityToggleButton(showAll: showsShowAllGrades) {
-                                if showsShowAllGrades {
-                                    var newGrades: [String] = []
-                                    for grade in grades {
-                                        if !shownGrades.contains(grade.id) {
-                                            newGrades.append(grade.id)
-                                        }
-                                    }
-                                    withAnimation {
-                                        shownGrades.append(contentsOf: newGrades)
-                                    }
-                                } else {
-                                    withAnimation {
-                                        shownGrades.removeAll { g in grades.first { $0.id == g } != nil }
-                                    }
-                                }
-                            }
-                        }
-                    }) {
+                    Section {
                         if grades.count > 0 {
                             ForEach(grades, id: \.courseCode) { grade in
                                 GradeRow(grade: grade, semester: selectedSemester!)
@@ -156,7 +96,43 @@ struct ExamView: View {
                         } else {
                             Text("暂无成绩")
                                 .foregroundStyle(.secondary)
+                                .listRowInsets(Self.cardRowInsets)
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
                         }
+                    } header: {
+                        HStack(spacing: 10) {
+                            SectionHeaderIcon(systemImage: "graduationcap.fill", tint: .mint)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("成绩")
+                                    .font(.headline)
+                                Text("已显示 \(shownGradeCount)/\(grades.count)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if grades.count > 0 {
+                                GradeVisibilityToggleButton(showAll: showsShowAllGrades) {
+                                    if showsShowAllGrades {
+                                        var newGrades: [String] = []
+                                        for grade in grades {
+                                            if !shownGrades.contains(grade.id) {
+                                                newGrades.append(grade.id)
+                                            }
+                                        }
+
+                                        withAnimation {
+                                            shownGrades.append(contentsOf: newGrades)
+                                        }
+                                    } else {
+                                        withAnimation {
+                                            shownGrades.removeAll { g in grades.first { $0.id == g } != nil }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, Self.sectionHeaderHorizontalPadding)
                     }
                     
                     if history.count > 0 {
@@ -176,8 +152,8 @@ struct ExamView: View {
                     }
                 }
                 .listStyle(.plain)
+                .listSectionSpacing(10)
                 .scrollContentBackground(.hidden)
-                .contentMargins(.horizontal, horizontalContentPadding, for: .scrollContent)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -329,6 +305,7 @@ struct ExamView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .padding(.horizontal, ExamView.sectionHeaderHorizontalPadding)
         }
     }
 
@@ -408,7 +385,7 @@ struct ExamView: View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(Color.primary.opacity(0.06), lineWidth: 1)
             )
-            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowInsets(ExamView.cardRowInsets)
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
             .sheet(isPresented: $showGradeScratchSheet) {
@@ -631,7 +608,7 @@ struct ExamView: View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(statusColor.opacity(0.15), lineWidth: 1)
             )
-            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowInsets(ExamView.cardRowInsets)
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
         }

@@ -200,22 +200,81 @@ struct RootTabView: View {
     @AppStorage("settings.always_show_unicode_in_tabbar") private var alwaysShowUnicode: Bool = true
     @StateObject var qaManager = QuickActionsManager.instance
     @Environment(\.scenePhase) var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @EnvironmentObject private var appConfig: AppConfig
-    
+
     @State private var isUnicodePresented = false
     @State private var isAccountViewPresent = false
     @State private var selectedIndex = 0
-    
+    @State private var selectedSidebarItem: SidebarItem? = .schedule
+    @State private var sidebarPath: [SidebarDestination] = []
+    @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
+    @StateObject private var busViewModel = BusMapViewModel()
+    @State private var busSidebarStation: BusAPI.Station?
+    @State private var busSidebarLineDetail: BusLineDetailSelection?
+
     @State private var showNoAccountAlert: Bool = false
     @State private var showNoPermission: Bool = false
     @State private var inSetting: Bool = false
+
+    enum SidebarItem: Hashable {
+        case schedule
+        case accounts
+        case dataSource
+        case customize
+        case canvasSettings
+        case canvasEvents
+        case notifications
+        case selfStudyClassroom
+        case exams
+        case campusCard
+        case bus
+        case about
+    }
+
+    private enum SidebarDestination: Hashable {
+        case busSidebar
+        case busStation
+        case busLineDetail
+    }
 
     private var shouldShowUnicodeTab: Bool {
         appConfig.appStatus == .review ||
         alwaysShowUnicode ||
         accounts.contains(where: { $0.provider == .jaccount && $0.enabledFeatures.contains(.unicode) })
     }
-    
+
+    private var jAccount: WebAuthAccount? {
+        accounts.first { $0.provider == .jaccount }
+    }
+
+    private var hasCanvasAccess: Bool {
+        guard let account = jAccount else { return false }
+        return account.enabledFeatures.contains(.canvas) && account.bizData["canvas_token"] != nil
+    }
+
+    private var hasExamAccess: Bool {
+        jAccount?.enabledFeatures.contains(.examAndGrade) ?? false
+    }
+
+    private var hasCampusCardAccess: Bool {
+        jAccount?.enabledFeatures.contains(.campusCard) ?? false
+    }
+
+    private var homeIconName: String {
+        displayMode == .day ? "calendar.day.timeline.left" : "calendar"
+    }
+
+    private var busSidebarPresentation: BusSidebarPresentation {
+        BusSidebarPresentation(
+            station: $busSidebarStation,
+            lineDetail: $busSidebarLineDetail,
+            showRoot: showBusSidebarRoot,
+            showStation: showBusSidebarStation,
+            showLineDetail: showBusSidebarLineDetail
+        )
+    }
+
     private func checkUnicode(alert: Bool = true) {
         if appConfig.appStatus == .review {
             isUnicodePresented = true
@@ -234,16 +293,15 @@ struct RootTabView: View {
             showNoAccountAlert = true
         }
     }
-    
+
     var body: some View {
-        NativeTabBarController(
-            selectedIndex: $selectedIndex,
-            displayMode: displayMode,
-            showsUnicodeTab: shouldShowUnicodeTab
-        ) {
-            checkUnicode()
+        Group {
+            if horizontalSizeClass == .regular {
+                sidebarLayout
+            } else {
+                tabBarLayout
+            }
         }
-        .ignoresSafeArea()
         .sheet(isPresented: $isUnicodePresented) {
             UnicodeView()
         }
@@ -300,6 +358,257 @@ struct RootTabView: View {
                 checkUnicode()
             }
         }
+        .onChange(of: selectedSidebarItem) { _, newValue in
+            if newValue != .bus, !sidebarPath.isEmpty {
+                sidebarPath.removeAll()
+            }
+            if newValue != .bus {
+                resetBusSidebarSelection()
+            }
+        }
+        .onChange(of: sidebarPath) { _, newValue in
+            syncBusSidebarSelection(with: newValue)
+        }
+    }
+
+    // MARK: - iPad Sidebar Layout
+
+    @ViewBuilder
+    private var sidebarLayout: some View {
+        NavigationSplitView(columnVisibility: $sidebarVisibility) {
+            NavigationStack(path: $sidebarPath) {
+                List(selection: $selectedSidebarItem) {
+                    Section {
+                        Label("日程", systemImage: homeIconName)
+                            .tag(SidebarItem.schedule)
+
+                        if shouldShowUnicodeTab {
+                            Button {
+                                checkUnicode()
+                            } label: {
+                                Label("思源码", systemImage: "qrcode")
+                            }
+                        }
+                    }
+
+                    if appConfig.appStatus == .normal {
+                        Section("设置") {
+                            Label("账户", systemImage: "person.crop.circle")
+                                .tag(SidebarItem.accounts)
+                            Label("数据源", systemImage: "square.and.arrow.down")
+                                .tag(SidebarItem.dataSource)
+                            Label("个性化", systemImage: "paintpalette")
+                                .tag(SidebarItem.customize)
+                            if hasCanvasAccess {
+                                Label("Canvas 设置", systemImage: "link.circle")
+                                    .tag(SidebarItem.canvasSettings)
+                            }
+                        }
+                    }
+
+                    Section("学在交大") {
+                        if hasCanvasAccess {
+                            Label("Canvas 待办事项", systemImage: "book.pages")
+                                .tag(SidebarItem.canvasEvents)
+                        }
+                        Label("教务通知", systemImage: "megaphone")
+                            .tag(SidebarItem.notifications)
+                        Label("自习教室", systemImage: "studentdesk")
+                            .tag(SidebarItem.selfStudyClassroom)
+                        if hasExamAccess {
+                            Label("考试与成绩", systemImage: "pencil.and.list.clipboard")
+                                .tag(SidebarItem.exams)
+                        }
+                    }
+
+                    Section("交大生活") {
+                        if hasCampusCardAccess {
+                            Label("校园卡", systemImage: "person.text.rectangle")
+                                .tag(SidebarItem.campusCard)
+                        }
+                        NavigationLink(value: SidebarDestination.busSidebar) {
+                            Label("校园巴士", systemImage: "bus.fill")
+                        }
+                        .tag(SidebarItem.bus)
+                    }
+
+                    Section {
+                        Label("关于", systemImage: "info.circle")
+                            .tag(SidebarItem.about)
+                    }
+                }
+                .listStyle(.sidebar)
+                .navigationTitle("交课表")
+                .navigationBarTitleDisplayMode(.large)
+                .navigationDestination(for: SidebarDestination.self) { destination in
+                    switch destination {
+                    case .busSidebar:
+                        BusSidebarRootView()
+                            .onAppear {
+                                selectedSidebarItem = .bus
+                            }
+                    case .busStation:
+                        if let station = busSidebarStation {
+                            BusSidebarStationNavigationView(
+                                station: station,
+                                viewModel: busViewModel,
+                                onSelectLineDetail: showBusSidebarLineDetail
+                            )
+                        } else {
+                            BusSidebarRootView()
+                        }
+                    case .busLineDetail:
+                        if let selection = busSidebarLineDetail {
+                            BusSidebarLineDetailNavigationView(
+                                selection: selection,
+                                viewModel: busViewModel,
+                                onSelectDirectionFilter: { mode in
+                                    showBusSidebarLineDetail(
+                                        selection.updatingDirectionFilter(mode)
+                                    )
+                                }
+                            )
+                        } else if let station = busSidebarStation {
+                            BusSidebarStationNavigationView(
+                                station: station,
+                                viewModel: busViewModel,
+                                onSelectLineDetail: showBusSidebarLineDetail
+                            )
+                        } else {
+                            BusSidebarRootView()
+                        }
+                    }
+                }
+            }
+        } detail: {
+            sidebarDetailView
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarDetailView: some View {
+        switch selectedSidebarItem {
+        case .schedule, nil:
+            ScheduleView()
+                .navigationBarTitleDisplayMode(.inline)
+        case .accounts:
+            NavigationStack {
+                AccountListView()
+            }
+        case .dataSource:
+            NavigationStack {
+                DataSourceView()
+            }
+        case .customize:
+            NavigationStack {
+                CustomizeView()
+            }
+        case .canvasSettings:
+            NavigationStack {
+                CanvasSettingsView()
+            }
+        case .canvasEvents:
+            NavigationStack {
+                CanvasEventsView()
+            }
+        case .notifications:
+            NavigationStack {
+                NotificationView()
+            }
+        case .selfStudyClassroom:
+            NavigationStack {
+                SelfStudyClassroomView()
+            }
+        case .exams:
+            NavigationStack {
+                ExamView()
+            }
+        case .campusCard:
+            NavigationStack {
+                CampusCardListView()
+            }
+        case .bus:
+            NavigationStack {
+                BusListView(
+                    sidebarPresentation: busSidebarPresentation,
+                    viewModel: busViewModel
+                )
+            }
+        case .about:
+            NavigationStack {
+                AboutView()
+            }
+        }
+    }
+
+    // MARK: - iPhone Tab Bar Layout
+
+    @ViewBuilder
+    private var tabBarLayout: some View {
+        NativeTabBarController(
+            selectedIndex: $selectedIndex,
+            displayMode: displayMode,
+            showsUnicodeTab: shouldShowUnicodeTab
+        ) {
+            checkUnicode()
+        }
+        .ignoresSafeArea()
+    }
+
+    private func showBusSidebarRoot() {
+        expandSidebarIfNeeded()
+        selectedSidebarItem = .bus
+        resetBusSidebarSelection()
+        sidebarPath = [.busSidebar]
+    }
+
+    private func showBusSidebarStation(
+        _ station: BusAPI.Station
+    ) {
+        expandSidebarIfNeeded()
+        selectedSidebarItem = .bus
+        busSidebarStation = station
+        busSidebarLineDetail = nil
+        sidebarPath = [.busSidebar, .busStation]
+    }
+
+    private func showBusSidebarLineDetail(
+        _ selection: BusLineDetailSelection
+    ) {
+        expandSidebarIfNeeded()
+        selectedSidebarItem = .bus
+        busSidebarStation = selection.station
+        busSidebarLineDetail = selection
+        sidebarPath = [.busSidebar, .busStation, .busLineDetail]
+    }
+
+    private func resetBusSidebarSelection() {
+        busSidebarStation = nil
+        busSidebarLineDetail = nil
+    }
+
+    private func syncBusSidebarSelection(
+        with path: [SidebarDestination]
+    ) {
+        guard selectedSidebarItem == .bus else {
+            return
+        }
+
+        if !path.contains(.busLineDetail) {
+            busSidebarLineDetail = nil
+        }
+
+        if !path.contains(.busStation) {
+            busSidebarStation = nil
+        }
+    }
+
+    private func expandSidebarIfNeeded() {
+        guard sidebarVisibility != .all else {
+            return
+        }
+
+        sidebarVisibility = .all
     }
 }
 

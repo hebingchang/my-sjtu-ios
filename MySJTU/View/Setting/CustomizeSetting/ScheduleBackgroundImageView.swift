@@ -24,15 +24,39 @@ struct ScheduleBackgroundImageView: View {
         }
     }
 
+    private enum OrientationMode: String, CaseIterable, Identifiable {
+        case portrait
+        case landscape
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .portrait: return "竖屏"
+            case .landscape: return "横屏"
+            }
+        }
+    }
+
     @AppStorage("schedule.backgroundImage") private var backgroundImage: URL?
     @AppStorage("schedule.backgroundImage.transparency") private var backgroundImageTransparency: Double = ScheduleBackgroundEffectConfiguration.defaultTransparency
     @AppStorage("schedule.backgroundImage.blurRadius") private var backgroundImageBlurRadius: Double = ScheduleBackgroundEffectConfiguration.defaultBlurRadius
     @AppStorage("schedule.backgroundImage.parallaxEnabled") private var backgroundImageParallaxEnabled: Bool = ScheduleBackgroundEffectConfiguration.defaultParallaxEnabled
 
+    @AppStorage("schedule.backgroundImage.landscape") private var landscapeBackgroundImage: URL?
+    @AppStorage("schedule.backgroundImage.landscape.transparency") private var landscapeBackgroundImageTransparency: Double = ScheduleBackgroundEffectConfiguration.defaultTransparency
+    @AppStorage("schedule.backgroundImage.landscape.blurRadius") private var landscapeBackgroundImageBlurRadius: Double = ScheduleBackgroundEffectConfiguration.defaultBlurRadius
+    @AppStorage("schedule.backgroundImage.landscape.parallaxEnabled") private var landscapeBackgroundImageParallaxEnabled: Bool = ScheduleBackgroundEffectConfiguration.defaultParallaxEnabled
+
     @State private var showImagePicker = false
     @State private var pickedBackgroundImage: UIImage?
     @State private var errorMessage: String?
     @State private var contextScreen: UIScreen?
+    @State private var selectedOrientation: OrientationMode = .portrait
+
+    private var isIPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
 
     private let previewCornerRadius: CGFloat = 28
     private let fallbackViewportSize = CGSize(width: 390, height: 844)
@@ -43,12 +67,63 @@ struct ScheduleBackgroundImageView: View {
         return bounds.size
     }
 
+    private var effectiveViewportSize: CGSize {
+        if selectedOrientation == .landscape {
+            // Swap dimensions for landscape crop
+            return CGSize(width: max(viewportSize.width, viewportSize.height),
+                          height: min(viewportSize.width, viewportSize.height))
+        }
+        return viewportSize
+    }
+
+    private var activeBackgroundImage: URL? {
+        selectedOrientation == .landscape ? landscapeBackgroundImage : backgroundImage
+    }
+
+    private var activeParallaxEnabled: Bool {
+        selectedOrientation == .landscape ? landscapeBackgroundImageParallaxEnabled : backgroundImageParallaxEnabled
+    }
+
+    private var activeTransparency: Double {
+        get { selectedOrientation == .landscape ? landscapeBackgroundImageTransparency : backgroundImageTransparency }
+    }
+
+    private var activeBlurRadius: Double {
+        get { selectedOrientation == .landscape ? landscapeBackgroundImageBlurRadius : backgroundImageBlurRadius }
+    }
+
+    private var activeTransparencyBinding: Binding<Double> {
+        selectedOrientation == .landscape
+        ? $landscapeBackgroundImageTransparency
+        : $backgroundImageTransparency
+    }
+
+    private var activeBlurRadiusBinding: Binding<Double> {
+        selectedOrientation == .landscape
+        ? $landscapeBackgroundImageBlurRadius
+        : $backgroundImageBlurRadius
+    }
+
+    private var activeParallaxEnabledBinding: Binding<Bool> {
+        selectedOrientation == .landscape
+        ? $landscapeBackgroundImageParallaxEnabled
+        : $backgroundImageParallaxEnabled
+    }
+
     private var previewImage: UIImage? {
-        guard let backgroundImage else { return nil }
-        return UIImage(contentsOfFile: backgroundImage.path)
+        guard let activeBackgroundImage else { return nil }
+        return UIImage(contentsOfFile: activeBackgroundImage.path)
     }
 
     private var previewAspectRatio: CGFloat {
+        if selectedOrientation == .landscape {
+            guard let previewImage else {
+                return ScheduleBackgroundEffectConfiguration.landscapeBackgroundAspectRatio(for: viewportSize)
+            }
+            let imageAR = ScheduleBackgroundEffectConfiguration.imageAspectRatio(for: previewImage.size)
+                ?? ScheduleBackgroundEffectConfiguration.landscapeBackgroundAspectRatio(for: viewportSize)
+            return max(imageAR, ScheduleBackgroundEffectConfiguration.landscapeBackgroundAspectRatio(for: viewportSize))
+        }
         guard let previewImage else {
             return ScheduleBackgroundEffectConfiguration.maximumBackgroundAspectRatio(for: viewportSize)
         }
@@ -59,11 +134,19 @@ struct ScheduleBackgroundImageView: View {
     }
 
     private var backgroundCropHeight: CGFloat {
-        min(viewportSize.height * 0.62, 520)
+        if selectedOrientation == .landscape {
+            return min(viewportSize.height * 0.42, 340)
+        }
+        return min(viewportSize.height * 0.62, 520)
     }
 
     private var backgroundCropAspectRatio: CGFloat {
-        backgroundImageParallaxEnabled
+        if selectedOrientation == .landscape {
+            return activeParallaxEnabled
+            ? ScheduleBackgroundEffectConfiguration.landscapeParallaxBackgroundAspectRatio(for: viewportSize)
+            : ScheduleBackgroundEffectConfiguration.landscapeBackgroundAspectRatio(for: viewportSize)
+        }
+        return activeParallaxEnabled
         ? ScheduleBackgroundEffectConfiguration.parallaxBackgroundAspectRatio(for: viewportSize)
         : ScheduleBackgroundEffectConfiguration.maximumBackgroundAspectRatio(for: viewportSize)
     }
@@ -77,8 +160,8 @@ struct ScheduleBackgroundImageView: View {
 
     private var backgroundEffect: ScheduleBackgroundEffectConfiguration {
         .init(
-            transparency: backgroundImageTransparency,
-            blurRadius: backgroundImageBlurRadius
+            transparency: activeTransparency,
+            blurRadius: activeBlurRadius
         )
     }
 
@@ -92,11 +175,11 @@ struct ScheduleBackgroundImageView: View {
 
     private var effectiveParallaxEnabled: Bool {
         guard previewImage != nil else { return false }
-        return backgroundImageParallaxEnabled
+        return activeParallaxEnabled
     }
 
     private var previewParallaxStatusText: String {
-        backgroundImageParallaxEnabled ? "开启" : "关闭"
+        activeParallaxEnabled ? "开启" : "关闭"
     }
 
     private var usesDefaultSettings: Bool {
@@ -104,22 +187,22 @@ struct ScheduleBackgroundImageView: View {
     }
 
     private var previewSummaryTitle: String {
-        backgroundImage == nil ? "还没有设置背景图片" : "背景图片已准备好"
+        activeBackgroundImage == nil ? "还没有设置背景图片" : "背景图片已准备好"
     }
 
     private var previewSummaryText: String {
-        if backgroundImage == nil {
+        if activeBackgroundImage == nil {
             return "点按卡片选择一张图片，裁切时可以直接决定是否开启视差滚动。"
         }
         return "当前图片会显示在课表页底层。点按卡片可以重新裁切或更换。"
     }
 
     private var previewCropModeText: String {
-        backgroundImageParallaxEnabled ? "视差比例" : "屏幕比例"
+        activeParallaxEnabled ? "视差比例" : "屏幕比例"
     }
 
     private var previewTapHintText: String {
-        backgroundImage == nil ? "点按选择图片" : "点按重新裁切或更换"
+        activeBackgroundImage == nil ? "点按选择图片" : "点按重新裁切或更换"
     }
 
     private var previewArtworkSize: CGSize {
@@ -135,8 +218,13 @@ struct ScheduleBackgroundImageView: View {
     }
 
     private func resetEffect() {
-        backgroundImageTransparency = ScheduleBackgroundEffectConfiguration.defaultTransparency
-        backgroundImageBlurRadius = ScheduleBackgroundEffectConfiguration.defaultBlurRadius
+        if selectedOrientation == .landscape {
+            landscapeBackgroundImageTransparency = ScheduleBackgroundEffectConfiguration.defaultTransparency
+            landscapeBackgroundImageBlurRadius = ScheduleBackgroundEffectConfiguration.defaultBlurRadius
+        } else {
+            backgroundImageTransparency = ScheduleBackgroundEffectConfiguration.defaultTransparency
+            backgroundImageBlurRadius = ScheduleBackgroundEffectConfiguration.defaultBlurRadius
+        }
     }
 
     private func savePhoto(_ image: UIImage) throws -> URL {
@@ -159,12 +247,18 @@ struct ScheduleBackgroundImageView: View {
     }
 
     private func replaceBackgroundImage(with image: UIImage, parallaxEnabled: Bool) {
-        let previousImageURL = backgroundImage
+        let previousImageURL = activeBackgroundImage
 
         do {
             let newImageURL = try savePhoto(image)
-            backgroundImage = newImageURL
-            backgroundImageParallaxEnabled = parallaxEnabled
+
+            if selectedOrientation == .landscape {
+                landscapeBackgroundImage = newImageURL
+                landscapeBackgroundImageParallaxEnabled = parallaxEnabled
+            } else {
+                backgroundImage = newImageURL
+                backgroundImageParallaxEnabled = parallaxEnabled
+            }
 
             if let previousImageURL {
                 try deletePhoto(at: previousImageURL)
@@ -175,11 +269,15 @@ struct ScheduleBackgroundImageView: View {
     }
 
     private func removeBackgroundImage() {
-        guard let backgroundImage else { return }
+        guard let activeBackgroundImage else { return }
 
         do {
-            try deletePhoto(at: backgroundImage)
-            self.backgroundImage = nil
+            try deletePhoto(at: activeBackgroundImage)
+            if selectedOrientation == .landscape {
+                landscapeBackgroundImage = nil
+            } else {
+                backgroundImage = nil
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -191,6 +289,9 @@ struct ScheduleBackgroundImageView: View {
 
     var body: some View {
         List {
+            if isIPad {
+                orientationPickerSection
+            }
             previewSection
             actionSection
             effectSection
@@ -219,7 +320,7 @@ struct ScheduleBackgroundImageView: View {
             show: $showImagePicker,
             croppedImage: $pickedBackgroundImage
         ) {
-            Toggle(isOn: $backgroundImageParallaxEnabled) {
+            Toggle(isOn: activeParallaxEnabledBinding) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("滚动视差")
                     Text("开启后会使用更高的裁切画幅，滚动时会有轻微位移。")
@@ -232,11 +333,28 @@ struct ScheduleBackgroundImageView: View {
         }
         .onChange(of: pickedBackgroundImage) { _, newImage in
             guard let newImage else { return }
-            replaceBackgroundImage(with: newImage, parallaxEnabled: backgroundImageParallaxEnabled)
+            replaceBackgroundImage(with: newImage, parallaxEnabled: activeParallaxEnabled)
             pickedBackgroundImage = nil
         }
         .onContextScreenChange { screen in
             contextScreen = screen
+        }
+    }
+
+    private var orientationPickerSection: some View {
+        Section {
+            Picker("方向", selection: $selectedOrientation) {
+                ForEach(OrientationMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .listRowBackground(Color.clear)
+            .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+        } footer: {
+            Text("你可以分别为竖屏和横屏设置不同的背景图片。")
+                .font(.footnote)
+                .foregroundStyle(Color(UIColor.secondaryLabel))
         }
     }
 
@@ -251,10 +369,10 @@ struct ScheduleBackgroundImageView: View {
             Button {
                 beginImageSelection()
             } label: {
-                Label(backgroundImage == nil ? "选择背景图片" : "更换背景图片", systemImage: "photo")
+                Label(activeBackgroundImage == nil ? "选择背景图片" : "更换背景图片", systemImage: "photo")
             }
 
-            if backgroundImage != nil {
+            if activeBackgroundImage != nil {
                 Button(role: .destructive) {
                     removeBackgroundImage()
                 } label: {
@@ -271,7 +389,7 @@ struct ScheduleBackgroundImageView: View {
                 valueText: transparencyText
             ) {
                 Slider(
-                    value: $backgroundImageTransparency,
+                    value: activeTransparencyBinding,
                     in: ScheduleBackgroundEffectConfiguration.transparencyRange
                 )
             }
@@ -281,7 +399,7 @@ struct ScheduleBackgroundImageView: View {
                 valueText: blurRadiusText
             ) {
                 Slider(
-                    value: $backgroundImageBlurRadius,
+                    value: activeBlurRadiusBinding,
                     in: ScheduleBackgroundEffectConfiguration.blurRadiusRange,
                     step: 1
                 )
