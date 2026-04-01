@@ -2032,15 +2032,19 @@ struct CanvasAPI {
         guard let token else {
             throw APIError.noAccount
         }
-        
-        let response = try await AF.request(
+
+        let response = await AF.request(
             "https://oc.sjtu.edu.cn/api/v1/users/self/upcoming_events",
             headers: [
                 "Authorization": "Bearer \(token)"
             ]
-        ).serializingDecodable([Event].self).value
-        
-        return response
+        ).serializingDecodable([Event].self).response
+
+        if response.response?.statusCode == 401 {
+            throw APIError.sessionExpired
+        }
+
+        return try response.result.get()
     }
     
     func checkToken() async throws {

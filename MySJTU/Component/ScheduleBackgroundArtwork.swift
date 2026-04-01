@@ -66,8 +66,19 @@ struct ScheduleBackgroundEffectConfiguration: Equatable {
         return width / height
     }
 
+    static func landscapeBackgroundAspectRatio(for viewportSize: CGSize) -> CGFloat {
+        let width = max(viewportSize.width, viewportSize.height)
+        let height = min(viewportSize.width, viewportSize.height)
+        guard width > 0, height > 0 else { return 19.5 / 9.0 }
+        return width / height
+    }
+
     static func parallaxBackgroundAspectRatio(for viewportSize: CGSize) -> CGFloat {
         maximumBackgroundAspectRatio(for: viewportSize) * parallaxCropAspectRatioMultiplier
+    }
+
+    static func landscapeParallaxBackgroundAspectRatio(for viewportSize: CGSize) -> CGFloat {
+        landscapeBackgroundAspectRatio(for: viewportSize) * parallaxCropAspectRatioMultiplier
     }
 
     static func imageAspectRatio(for imageSize: CGSize) -> CGFloat? {
