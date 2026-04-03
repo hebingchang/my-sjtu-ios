@@ -884,7 +884,6 @@ private struct WidgetBackgroundSlotEditorView: View {
     @State private var showImagePicker = false
     @State private var pickedImage: UIImage?
     @State private var errorMessage: String?
-    @State private var reloadTimelinesTask: Task<Void, Never>?
     @State private var contextScreen: UIScreen?
 
     init(slot: WidgetBackgroundSlot) {
@@ -952,25 +951,20 @@ private struct WidgetBackgroundSlotEditorView: View {
         showImagePicker = true
     }
 
-    private func scheduleDebouncedWidgetReload() {
-        reloadTimelinesTask?.cancel()
-        reloadTimelinesTask = Task {
-            try? await Task.sleep(nanoseconds: 250_000_000)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                WidgetCenter.shared.reloadAllTimelines()
-            }
-        }
-    }
-
     private func reloadWidgetTimelines() {
-        reloadTimelinesTask?.cancel()
         WidgetCenter.shared.reloadAllTimelines()
     }
 
     private func resetEffect() {
         backgroundTransparency = WidgetBackgroundEffectConfiguration.defaultTransparency
         backgroundBlurRadius = WidgetBackgroundEffectConfiguration.defaultBlurRadius
+        reloadWidgetTimelines()
+    }
+
+    private func handleEffectSliderEditingChanged(_ isEditing: Bool) {
+        guard !isEditing else { return }
+        print("reload!")
+        reloadWidgetTimelines()
     }
 
     private func replaceBackgroundImage(with image: UIImage) {
@@ -1055,7 +1049,8 @@ private struct WidgetBackgroundSlotEditorView: View {
                 ) {
                     Slider(
                         value: $backgroundTransparency,
-                        in: WidgetBackgroundEffectConfiguration.transparencyRange
+                        in: WidgetBackgroundEffectConfiguration.transparencyRange,
+                        onEditingChanged: handleEffectSliderEditingChanged
                     )
                 }
 
@@ -1066,7 +1061,8 @@ private struct WidgetBackgroundSlotEditorView: View {
                     Slider(
                         value: $backgroundBlurRadius,
                         in: WidgetBackgroundEffectConfiguration.blurRadiusRange,
-                        step: 1
+                        step: 1,
+                        onEditingChanged: handleEffectSliderEditingChanged
                     )
                 }
 
@@ -1115,12 +1111,6 @@ private struct WidgetBackgroundSlotEditorView: View {
             guard let newImage else { return }
             replaceBackgroundImage(with: newImage)
             pickedImage = nil
-        }
-        .onChange(of: backgroundTransparency) { _, _ in
-            scheduleDebouncedWidgetReload()
-        }
-        .onChange(of: backgroundBlurRadius) { _, _ in
-            scheduleDebouncedWidgetReload()
         }
         .onContextScreenChange { screen in
             contextScreen = screen

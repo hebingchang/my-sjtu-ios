@@ -244,6 +244,10 @@ struct RootTabView: View {
         accounts.contains(where: { $0.provider == .jaccount && $0.enabledFeatures.contains(.unicode) })
     }
 
+    private var shouldUseSidebarLayout: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular
+    }
+
     private var jAccount: WebAuthAccount? {
         accounts.first { $0.provider == .jaccount }
     }
@@ -296,7 +300,7 @@ struct RootTabView: View {
 
     var body: some View {
         Group {
-            if horizontalSizeClass == .regular {
+            if shouldUseSidebarLayout {
                 sidebarLayout
             } else {
                 tabBarLayout
