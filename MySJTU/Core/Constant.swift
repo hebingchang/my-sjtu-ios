@@ -107,9 +107,22 @@ let CollegeTimeTable: Dictionary<College, TimeTable> = [
 
 func getPeriodByTime(college: College, time: String) -> Period? {
     let periods = CollegeTimeTable[college]!
+    let targetTime = parseTimeComponent(time)
+
     return periods.first { period in
-        Int(period.start.split(separator: ":")[0])! * 100 + Int(period.start.split(separator: ":")[1])! == Int(time.split(separator: ":")[0])! * 100 + Int(time.split(separator: ":")[1])!
+        parseTimeComponent(period.start) == targetTime
     }
+}
+
+private func parseTimeComponent(_ value: String) -> Int? {
+    let components = value.split(separator: ":")
+    guard components.count == 2,
+          let hour = Int(components[0]),
+          let minute = Int(components[1]) else {
+        return nil
+    }
+
+    return hour * 100 + minute
 }
 
 typealias ClassColorsType = [String]

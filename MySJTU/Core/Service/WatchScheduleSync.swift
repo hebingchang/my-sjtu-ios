@@ -48,7 +48,7 @@ enum WatchScheduleSnapshotBuilder {
     }
 
     static func makeSnapshot(referenceDate: Date = .now) throws -> WatchScheduleSnapshot {
-        let colleges = selectedColleges()
+        let colleges = AcademicContextService.selectedColleges()
         let rangeStart = referenceDate.startOfWeek()
         let dates = (0..<dayRangeLength).map { rangeStart.addDays($0) }
 
@@ -80,43 +80,9 @@ enum WatchScheduleSnapshotBuilder {
 
         return WatchScheduleSnapshot(
             generatedAt: .now,
-            sourceName: selectedSourceName(),
+            sourceName: AcademicContextService.selectedSourceName(),
             days: days
         )
-    }
-
-    private static func selectedColleges(defaults: UserDefaults = .shared) -> [College] {
-        let rawCollegeValue = defaults.object(forKey: "collegeId") as? Int ?? College.sjtu.rawValue
-        let selectedCollege = College(rawValue: rawCollegeValue) ?? .sjtu
-        let showBothCollege = defaults.bool(forKey: "showBothCollege")
-
-        if selectedCollege == .sjtu && showBothCollege {
-            return [.sjtu, .sjtug]
-        }
-
-        return [selectedCollege]
-    }
-
-    private static func selectedSourceName(defaults: UserDefaults = .shared) -> String {
-        let colleges = selectedColleges(defaults: defaults)
-        if colleges == [.sjtu, .sjtug] {
-            return "本科 + 研究生"
-        }
-
-        return shortName(for: colleges.first ?? .sjtu)
-    }
-
-    private static func shortName(for college: College) -> String {
-        switch college {
-        case .sjtu:
-            return "本科"
-        case .sjtug:
-            return "研究生"
-        case .joint:
-            return "密院 / 浦江"
-        case .shsmu:
-            return "医学院"
-        }
     }
 
     private static func scheduleItems(
@@ -126,7 +92,7 @@ enum WatchScheduleSnapshotBuilder {
     ) -> [WatchScheduleItemSnapshot] {
         schedules.map { info in
             let location = info.schedule.classroom == "." ? "不排教室" : info.schedule.classroom
-            let prefix = includeSourcePrefix ? "\(shortName(for: info.class_.college)) · " : ""
+            let prefix = includeSourcePrefix ? "\(AcademicContextService.shortName(for: info.class_.college)) · " : ""
 
             return WatchScheduleItemSnapshot(
                 id: info.id,
@@ -153,7 +119,7 @@ enum WatchScheduleSnapshotBuilder {
 
             let prefix: String
             if includeSourcePrefix, let college = schedule.college {
-                prefix = "\(shortName(for: college)) · "
+                prefix = "\(AcademicContextService.shortName(for: college)) · "
             } else {
                 prefix = ""
             }

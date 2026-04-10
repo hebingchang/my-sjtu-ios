@@ -963,7 +963,6 @@ private struct WidgetBackgroundSlotEditorView: View {
 
     private func handleEffectSliderEditingChanged(_ isEditing: Bool) {
         guard !isEditing else { return }
-        print("reload!")
         reloadWidgetTimelines()
     }
 

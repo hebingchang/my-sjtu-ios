@@ -216,34 +216,40 @@ extension CustomSchedule {
         return selfMinute < otherMinute
     }
 
+    private func overlapsDisplayedTimeSlot(_ period: Period, scheduleStartTime: String, scheduleEndTime: String) -> Bool {
+        isBefore(time1: scheduleStartTime, time2: period.finish) &&
+        isBefore(time1: period.start, time2: scheduleEndTime)
+    }
+
     func period() -> Int {
         guard let college else { return 0 }
         let periods = CollegeTimeTable[college]!
         let scheduleStartTime = begin.formatted(format: "H:mm")
-        
-        for period in periods {
-            if isBefore(time1: scheduleStartTime, time2: period.finish) {
-                return period.id
-            }
-        }
-        
-        return 0
+        let scheduleEndTime = end.formatted(format: "H:mm")
+
+        return periods.firstIndex { period in
+            overlapsDisplayedTimeSlot(
+                period,
+                scheduleStartTime: scheduleStartTime,
+                scheduleEndTime: scheduleEndTime
+            )
+        } ?? 0
     }
     
     func length() -> Int {
         guard let college else { return 0 }
-        let startPeriod = period()
-        guard startPeriod != 0 else { return 0 }
+        let scheduleStartTime = begin.formatted(format: "H:mm")
         let scheduleEndTime = end.formatted(format: "H:mm")
-
         let periods = CollegeTimeTable[college]!
-        for period in periods {
-            if isBefore(time1: scheduleEndTime, time2: period.start) {
-                return period.id - startPeriod
+        return periods.reduce(into: 0) { count, period in
+            if overlapsDisplayedTimeSlot(
+                period,
+                scheduleStartTime: scheduleStartTime,
+                scheduleEndTime: scheduleEndTime
+            ) {
+                count += 1
             }
         }
-        
-        return 0
     }
 }
 

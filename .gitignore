@@ -96,3 +96,6 @@ apollo-ios-cli
 .tmp
 .swift-module-cache
 .deriveddata
+
+# Google Service
+GoogleService-Info.plist

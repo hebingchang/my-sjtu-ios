@@ -7,6 +7,8 @@
 
 import Foundation
 import UIKit
+import UserNotifications
+import FirebaseCore
 
 class QuickActionsManager: ObservableObject {
     static let instance = QuickActionsManager()
@@ -23,7 +25,17 @@ enum QuickAction: Hashable {
     case unicode
 }
 
-class AppDelegate: NSObject, UIApplicationDelegate {
+class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        FirebaseApp.configure()
+        UNUserNotificationCenter.current().delegate = self
+
+        return true
+    }
+
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         if let shortcutItem = options.shortcutItem {
             QuickActionsManager.instance.handleQaItem(shortcutItem)
@@ -37,6 +49,35 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         CanvasVideoOrientationController.currentMask
+    }
+    
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        if ToolNotificationService.isManagedNotification(notification) {
+            completionHandler([])
+            Task {
+                await ToolNotificationService.shared.handleTriggeredNotification(notification)
+            }
+            return
+        }
+
+        completionHandler([.banner, .sound, .badge])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        Task {
+            await ToolNotificationService.shared.handleTriggeredNotification(
+                response.notification
+            )
+            completionHandler()
+        }
     }
 }
 

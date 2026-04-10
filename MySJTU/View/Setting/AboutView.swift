@@ -34,6 +34,12 @@ struct AboutView: View {
             }
             
             Section(header: Text("反馈")) {
+                NavigationLink {
+                    FeedbackView()
+                } label: {
+                    Label("应用内反馈", systemImage: "bubble.left.and.exclamationmark.bubble.right")
+                }
+
                 Link(destination: shuiyuanDiscussionURL) {
                     HStack(spacing: 12) {                        
                         VStack(alignment: .leading, spacing: 2) {

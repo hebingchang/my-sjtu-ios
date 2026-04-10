@@ -364,7 +364,7 @@ enum BusAPI {
         _ url: String,
         payloadType: Payload.Type
     ) async throws -> Payload {
-        let envelope = try await AF.request(
+        let envelope = try await AppAF.session.request(
             url,
             parameters: ["r": Date.now.timeIntervalSince1970],
             encoding: URLEncoding(destination: .queryString)

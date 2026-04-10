@@ -31,7 +31,7 @@ class AppConfig: ObservableObject {
 }
 
 func getAppStatus() async throws -> AppConfig.AppStatus {
-    let config = try await AF.request(appConfigUrl, parameters: ["r": Date.now.timeIntervalSince1970]).serializingDecodable(AppConfigResponse.self).value
+    let config = try await AppAF.session.request(appConfigUrl, parameters: ["r": Date.now.timeIntervalSince1970]).serializingDecodable(AppConfigResponse.self).value
     guard let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String else {
         return .normal
     }
@@ -43,11 +43,11 @@ func getAppStatus() async throws -> AppConfig.AppStatus {
 }
 
 func getScheduleSample<T: Decodable>() async throws -> T {
-    let sample = try await AF.request(scheduleSampleUrl).serializingDecodable(T.self).value
+    let sample = try await AppAF.session.request(scheduleSampleUrl).serializingDecodable(T.self).value
     return sample
 }
 
 func getUnicodeSample<T: Decodable>() async throws -> T {
-    let sample = try await AF.request(unicodeSampleUrl).serializingDecodable(T.self).value
+    let sample = try await AppAF.session.request(unicodeSampleUrl).serializingDecodable(T.self).value
     return sample
 }

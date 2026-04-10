@@ -7,8 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5A0E60282F897994004F0C85 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0E60272F897994004F0C85 /* FirebaseAnalytics */; };
 		5A65AB2E2D0C698700AE5000 /* FeedKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5A65AB2D2D0C698700AE5000 /* FeedKit */; };
 		5A65AB352D0C74F500AE5000 /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 5A65AB342D0C74F500AE5000 /* Collections */; };
+		5A7052AB2F803E3F00F9424F /* SwiftMath in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7052AA2F803E3F00F9424F /* SwiftMath */; };
+		5A7052AE2F80454C00F9424F /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7052AD2F80454C00F9424F /* Markdown */; };
 		5A7A25CD2CE09560003F677F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25CC2CE09560003F677F /* Lottie */; };
 		5A7A25D32CE0D795003F677F /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25D22CE0D795003F677F /* Alamofire */; };
 		5A7A25DC2CE3212E003F677F /* QRCode in Frameworks */ = {isa = PBXBuildFile; productRef = 5A7A25DB2CE3212E003F677F /* QRCode */; };
@@ -97,6 +100,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5A0E60292F897A74004F0C85 /* Exceptions for "MySJTU" folder in "MySJTUWatch" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"GoogleService-Info.plist",
+			);
+			target = 5A7C9F002F768E9800B510A7 /* MySJTUWatch */;
+		};
 		5A7A25E62CE33304003F677F /* Exceptions for "MySJTU" folder in "MySJTU" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -118,6 +128,7 @@
 				Extension/Color.swift,
 				Extension/Date.swift,
 				Extension/UserDefaults.swift,
+				"GoogleService-Info.plist",
 				Model/Common.swift,
 				Model/Schedule.swift,
 			);
@@ -149,6 +160,7 @@
 			exceptions = (
 				5A7A25E62CE33304003F677F /* Exceptions for "MySJTU" folder in "MySJTU" target */,
 				5A7D7FCE2CF4A3C4001C6B90 /* Exceptions for "MySJTU" folder in "MySJTUWidgetExtension" target */,
+				5A0E60292F897A74004F0C85 /* Exceptions for "MySJTU" folder in "MySJTUWatch" target */,
 			);
 			path = MySJTU;
 			sourceTree = "<group>";
@@ -191,11 +203,14 @@
 				5AACB72C2CC401C0003333CA /* SQLite in Frameworks */,
 				5AE261F92CE50F6600412A00 /* AcknowList in Frameworks */,
 				5A7A25D32CE0D795003F677F /* Alamofire in Frameworks */,
+				5A7052AE2F80454C00F9424F /* Markdown in Frameworks */,
 				5A65AB352D0C74F500AE5000 /* Collections in Frameworks */,
 				5A65AB2E2D0C698700AE5000 /* FeedKit in Frameworks */,
 				5AACB7532CC42EA5003333CA /* SwiftUIIntrospect in Frameworks */,
+				5A7052AB2F803E3F00F9424F /* SwiftMath in Frameworks */,
 				5A7A25DC2CE3212E003F677F /* QRCode in Frameworks */,
 				5ADC4A9A2CDA08A300EECE31 /* GRDBQuery in Frameworks */,
+				5A0E60282F897994004F0C85 /* FirebaseAnalytics in Frameworks */,
 				5ADC4A922CDA01BD00EECE31 /* GRDB in Frameworks */,
 				5A7A25CD2CE09560003F677F /* Lottie in Frameworks */,
 				5A9F0F0A2CF1C383001A91B1 /* Apollo in Frameworks */,
@@ -341,6 +356,9 @@
 				5A65AB2D2D0C698700AE5000 /* FeedKit */,
 				5A65AB342D0C74F500AE5000 /* Collections */,
 				5A7BA2692F7A581700690E11 /* VLCKitSPM */,
+				5A7052AA2F803E3F00F9424F /* SwiftMath */,
+				5A7052AD2F80454C00F9424F /* Markdown */,
+				5A0E60272F897994004F0C85 /* FirebaseAnalytics */,
 			);
 			productName = MySJTU;
 			productReference = 5AE57A552CA8013700A42DE6 /* MySJTU.app */;
@@ -445,6 +463,9 @@
 				5A65AB2C2D0C698700AE5000 /* XCRemoteSwiftPackageReference "FeedKit" */,
 				5A65AB332D0C74F500AE5000 /* XCRemoteSwiftPackageReference "swift-collections" */,
 				5A7BA2682F7A581700690E11 /* XCRemoteSwiftPackageReference "vlckit-spm" */,
+				5A7052A92F803E3F00F9424F /* XCRemoteSwiftPackageReference "SwiftMath" */,
+				5A7052AC2F80454C00F9424F /* XCRemoteSwiftPackageReference "swift-markdown" */,
+				5A0E60262F897994004F0C85 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5AE57A562CA8013700A42DE6 /* Products */;
@@ -569,7 +590,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "交课表";
@@ -603,7 +624,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "交课表";
@@ -638,13 +659,13 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTUWidget/MySJTUWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MySJTUWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MySJTUWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -678,13 +699,13 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTUWidget/MySJTUWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MySJTUWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MySJTUWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -744,7 +765,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = HK6N26354D;
@@ -769,6 +790,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_LDFLAGS = "";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -810,7 +832,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = HK6N26354D;
@@ -828,6 +850,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				OTHER_LDFLAGS = "";
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -842,7 +865,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTU/MySJTU.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MySJTU/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -875,6 +898,7 @@
 				OTHER_LDFLAGS = (
 					"-Xlinker",
 					"-interposable",
+					"-ObjC",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.boar.sjct;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -898,7 +922,7 @@
 				CODE_SIGN_ENTITLEMENTS = MySJTU/MySJTU.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MySJTU/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -928,6 +952,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 2.1.0;
+				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_BUNDLE_IDENTIFIER = com.boar.sjct;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -947,10 +972,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.boar.MySJTUTests;
@@ -970,10 +995,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.boar.MySJTUTests;
@@ -992,7 +1017,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1014,7 +1039,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 144;
+				CURRENT_PROJECT_VERSION = 147;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1092,6 +1117,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		5A0E60262F897994004F0C85 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.12.0;
+			};
+		};
 		5A65AB2C2D0C698700AE5000 /* XCRemoteSwiftPackageReference "FeedKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/nmdias/FeedKit.git";
@@ -1106,6 +1139,22 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 1.1.4;
+			};
+		};
+		5A7052A92F803E3F00F9424F /* XCRemoteSwiftPackageReference "SwiftMath" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mgriebling/SwiftMath.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.7.3;
+			};
+		};
+		5A7052AC2F80454C00F9424F /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swiftlang/swift-markdown.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.7.3;
 			};
 		};
 		5A7A25CB2CE09560003F677F /* XCRemoteSwiftPackageReference "lottie-spm" */ = {
@@ -1199,6 +1248,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		5A0E60272F897994004F0C85 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A0E60262F897994004F0C85 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
 		5A65AB2D2D0C698700AE5000 /* FeedKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 5A65AB2C2D0C698700AE5000 /* XCRemoteSwiftPackageReference "FeedKit" */;
@@ -1208,6 +1262,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5A65AB332D0C74F500AE5000 /* XCRemoteSwiftPackageReference "swift-collections" */;
 			productName = Collections;
+		};
+		5A7052AA2F803E3F00F9424F /* SwiftMath */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A7052A92F803E3F00F9424F /* XCRemoteSwiftPackageReference "SwiftMath" */;
+			productName = SwiftMath;
+		};
+		5A7052AD2F80454C00F9424F /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A7052AC2F80454C00F9424F /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
 		};
 		5A7A25CC2CE09560003F677F /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;

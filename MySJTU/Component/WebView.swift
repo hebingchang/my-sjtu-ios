@@ -132,6 +132,7 @@ struct WebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         wkwebView.navigationDelegate = context.coordinator
         wkwebView.allowsBackForwardNavigationGestures = true
+        wkwebView.customUserAgent = AppUserAgent.value
         wkwebView.addObserver(context.coordinator, forKeyPath: #keyPath(WKWebView.canGoBack), options: [.new], context: nil)
         wkwebView.addObserver(context.coordinator, forKeyPath: #keyPath(WKWebView.canGoForward), options: [.new], context: nil)
         wkwebView.addObserver(context.coordinator, forKeyPath: #keyPath(WKWebView.isLoading), options: [.new], context: nil)

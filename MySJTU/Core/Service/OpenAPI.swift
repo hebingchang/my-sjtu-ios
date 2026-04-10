@@ -37,7 +37,7 @@ func getSemesters(college: College) async throws -> [Semester] {
     default: "https://s3.jcloud.sjtu.edu.cn/9fd44bb76f604e8597acfcceada7cb83-tongqu/class_table/calendar.json"
     }
 
-    let response = try await AF.request(
+    let response = try await AppAF.session.request(
         url,
         parameters: [
             "r": Date.now.timeIntervalSince1970
@@ -186,7 +186,7 @@ struct SHSMUOpenAPI {
             
             while true {
                 do {
-                    return try await AF.request(
+                    return try await AppAF.session.request(
                         calendarTableURL,
                         parameters: parameters,
                         encoding: URLEncoding(destination: .queryString)
@@ -214,14 +214,14 @@ struct SHSMUOpenAPI {
         }
                 
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
         
-        _ = try await AF.request(
+        _ = try await AppAF.session.request(
             "\(baseUrl)/Home/Timetable"
         ).serializingString().value
         
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "\(baseUrl)/Home/GetCurriculumTable",
             parameters: [
                 "Start": start,
@@ -371,11 +371,11 @@ struct SHSMUOpenAPI {
     
     func getCourseInfo(schedule: ([[String: String]], CourseClassSchedule)) async throws -> CourseClassSchedule {
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
         
         for parameter in schedule.0 {
-            let response = try await AF.request(
+            let response = try await AppAF.session.request(
                 "\(baseUrl)/Home/GetCalendarTable",
                 parameters: parameter,
                 encoding: URLEncoding(destination: .queryString)
@@ -448,10 +448,10 @@ struct SJTUGOpenAPI {
     
     func getSchedules(semester: Semester) async throws -> [CourseClassSchedule] {
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
         
-        let _ = try await AF.request("https://yjs.sjtu.edu.cn/gsapp/sys/wdkbapp/*default/index.do")
+        let _ = try await AppAF.session.request("https://yjs.sjtu.edu.cn/gsapp/sys/wdkbapp/*default/index.do")
             .serializingString()
             .value
         
@@ -476,7 +476,7 @@ struct SJTUGOpenAPI {
             return "\(year)\(term)"
         }
         
-        let schedules = try await AF.request(
+        let schedules = try await AppAF.session.request(
             "https://yjs.sjtu.edu.cn/gsapp/sys/wdkbapp/modules/xskcb/xspkjgcx.do",
             method: .post,
             parameters: [
@@ -702,7 +702,7 @@ struct JointOpenAPI {
 
     private func prepareCookies() {
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
     }
 
@@ -762,7 +762,7 @@ struct JointOpenAPI {
     private func getLessonTasks(termId: String, studentId: String) async throws -> [StudentLessonTask] {
         prepareCookies()
 
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             Self.lessonTasksURL,
             parameters: [
                 "_t": Int64(Date.now.timeIntervalSince1970 * 1000),
@@ -782,7 +782,7 @@ struct JointOpenAPI {
     }
 
     private func getLessonDetail(bsid: String, accessToken: String) async throws -> SJTUOpenAPI.ClassSchedule? {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/lesson/\(bsid)",
             parameters: [
                 "access_token": accessToken
@@ -803,7 +803,7 @@ struct JointOpenAPI {
     func getUserInfo() async throws -> UserInfoResponse {
         prepareCookies()
 
-        return try await AF.request(
+        return try await AppAF.session.request(
             Self.userInfoURL,
             parameters: [
                 "jsonString": try serializedUserInfoRequest()
@@ -818,7 +818,7 @@ struct JointOpenAPI {
     func getTerms() async throws -> [Term] {
         prepareCookies()
 
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             Self.termsURL,
             parameters: [
                 "_t": Int64.random(in: 0...Int64.max),
@@ -862,7 +862,7 @@ struct JointOpenAPI {
     func getSchedules(jointSemester: Semester, sjtuSemester: Semester?, termId: String, studentId: String) async throws -> [CourseClassSchedule] {
         prepareCookies()
 
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             Self.schedulesURL,
             method: .post,
             parameters: [
@@ -1335,7 +1335,7 @@ struct SJTUOpenAPI {
 
     func getUnicode() async throws -> Unicode {
         let token = try await getToken(scopes: ["unicode"])
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/unicode/identity",
             parameters: [
                 "access_token": token.access_token
@@ -1367,7 +1367,7 @@ struct SJTUOpenAPI {
         if let limit {
             parameters["limit"] = limit
         }
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/unicode/transactions",
             parameters: parameters,
             encoding: URLEncoding(destination: .queryString)
@@ -1378,7 +1378,7 @@ struct SJTUOpenAPI {
     
     func getCampusCards() async throws -> [CampusCard] {
         let token = try await getToken(scopes: ["card"])
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/me/card",
             parameters: [
                 "access_token": token.access_token
@@ -1390,7 +1390,7 @@ struct SJTUOpenAPI {
     
     func chargeCampusCard(cardNo: String, amount: Int) async throws -> CardChargeResponse {
         let token = try await getToken(scopes: ["card"])
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/me/card/recharge",
             method: .post,
             parameters: [
@@ -1414,7 +1414,7 @@ struct SJTUOpenAPI {
     
     func getChargeStatus(cardNo: String, orderId: Int64) async throws -> CardChargeStatus {
         let token = try await getToken(scopes: ["card"])
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/me/card/recharge",
             parameters: [
                 "access_token": token.access_token,
@@ -1437,7 +1437,7 @@ struct SJTUOpenAPI {
     
     func getUncompleteCharges(cardNo: String) async throws -> [CardChargeStatus] {
         let token = try await getToken(scopes: ["card"])
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/me/card/recharge",
             parameters: [
                 "access_token": token.access_token,
@@ -1456,7 +1456,7 @@ struct SJTUOpenAPI {
     
     func getProfile() async throws -> Profile {
         let token = try await getToken(scopes: ["privacy"])
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/me/profile",
             parameters: [
                 "access_token": token.access_token
@@ -1473,7 +1473,7 @@ struct SJTUOpenAPI {
     
     func getCardPhoto(cardNo: String) async throws -> String? {
         let token = try await getToken(scopes: ["privacy"])
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/me/card/photo",
             parameters: [
                 "access_token": token.access_token,
@@ -1504,7 +1504,7 @@ struct SJTUOpenAPI {
         if let limit {
             parameters["limit"] = limit
         }
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/me/card/transactions",
             parameters: parameters,
             encoding: URLEncoding(destination: .queryString)
@@ -1518,7 +1518,7 @@ struct SJTUOpenAPI {
             response = try await getScheduleSample()
         } else {
             let token = try await getToken(scopes: ["lessons"])
-            response = try await AF.request(
+            response = try await AppAF.session.request(
                 "https://api.sjtu.edu.cn/v1/me/lessons/\(semester.year)-\(semester.year + 1)-\(semester.semester)",
                 parameters: [
                     "access_token": token.access_token
@@ -1608,6 +1608,22 @@ struct ElectSysAPI {
         let remark: String?
         let teacher: String
     }
+
+    struct GPAStatistics {
+        let className: String
+        let failedCourseCount: String
+        let failedCredits: String
+        let gpa: String
+        let gpaRank: String
+        let earnedCredits: String
+        let academicPoints: String
+        let academicPointsRank: String
+        let totalCredits: String
+        let courseScope: String?
+        let collegeName: String?
+        let majorName: String?
+        let updatedAt: String?
+    }
     
     private struct ElectSysResponse<T: Codable>: Codable {
         let currentPage, currentResult: Int
@@ -1651,13 +1667,33 @@ struct ElectSysAPI {
             case rowID = "row_id"
         }
     }
+
+    private struct ElectSysGPAStatistics: Codable {
+        let bj: String
+        let bjgms: String
+        let bjgxf: String
+        let czsj: String?
+        let gpa: String
+        let gpapm: String
+        let hdxf: String
+        let jgmc: String?
+        let kcfw: String?
+        let xjf: String
+        let xjfpm: String
+        let zxf: String
+        let zymc: String?
+    }
+
+    private static let gpaStatisticsSuccessMessage = "统计成功！"
+    private static let gpaStatisticsIgnoredGradeValues = "缓考,缓考(重考),尚未修读,暂不记录,中期退课,重考报名"
+    private static let gpaStatisticsExcludedCourseIDs = "MARX1205,TH009,TH020,FCE62B4E084826EBE055F8163EE1DCCC"
     
     func openIdConnect() async throws {
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
         
-        let response = try await AF.request("https://i.sjtu.edu.cn/jaccountlogin")
+        let response = try await AppAF.session.request("https://i.sjtu.edu.cn/jaccountlogin")
             .serializingString()
             .value
         if response.contains("无法登录") {
@@ -1666,7 +1702,7 @@ struct ElectSysAPI {
     }
     
     func getExams(year: Int, semester: Int) async throws -> [Exam] {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://i.sjtu.edu.cn/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105",
             method: .post,
             parameters: [
@@ -1705,7 +1741,7 @@ struct ElectSysAPI {
     }
     
     func getGrades(year: Int, semester: Int) async throws -> [Grade] {        
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://i.sjtu.edu.cn/cjcx/cjcx_cxXsgrcj.html?doType=query&gnmkdm=N305005",
             method: .post,
             parameters: [
@@ -1729,6 +1765,157 @@ struct ElectSysAPI {
                 teacher: grade.jsxm
             )
         }
+    }
+
+    func getGPAStatistics(
+        startYear: Int? = nil,
+        startSemester: Int? = nil,
+        endYear: Int? = nil,
+        endSemester: Int? = nil
+    ) async throws -> GPAStatistics? {
+        let range = try Self.resolveGPAStatisticsRange(
+            startYear: startYear,
+            startSemester: startSemester,
+            endYear: endYear,
+            endSemester: endSemester
+        )
+        let commonParameters = Self.gpaStatisticsCommonParameters(
+            startTermCode: range.startTermCode,
+            endTermCode: range.endTermCode
+        )
+
+        let triggerResponseData = try await AppAF.session.request(
+            "https://i.sjtu.edu.cn/cjpmtj/gpapmtj_tjGpapmtj.html?gnmkdm=N309131",
+            method: .post,
+            parameters: commonParameters,
+            encoding: URLEncoding.httpBody
+        ).serializingData().value
+
+        let triggerResponse = try Self.parseJSONStringResponse(triggerResponseData)
+        guard triggerResponse == Self.gpaStatisticsSuccessMessage else {
+            throw APIError.remoteError(triggerResponse)
+        }
+
+        var queryParameters = commonParameters
+        queryParameters["_search"] = "false"
+        queryParameters["nd"] = Int64(Date.now.timeIntervalSince1970 * 1000)
+        queryParameters["queryModel.showCount"] = 15
+        queryParameters["queryModel.currentPage"] = 1
+        queryParameters["queryModel.sortName"] = " "
+        queryParameters["queryModel.sortOrder"] = "asc"
+        queryParameters["time"] = 2
+
+        let response = try await AppAF.session.request(
+            "https://i.sjtu.edu.cn/cjpmtj/gpapmtj_cxGpaxjfcxIndex.html?doType=query&gnmkdm=N309131",
+            method: .post,
+            parameters: queryParameters,
+            encoding: URLEncoding.httpBody
+        ).serializingDecodable(ElectSysResponse<ElectSysGPAStatistics>.self).value
+
+        guard let item = response.items.first else {
+            return nil
+        }
+
+        return GPAStatistics(
+            className: item.bj,
+            failedCourseCount: item.bjgms,
+            failedCredits: item.bjgxf,
+            gpa: item.gpa,
+            gpaRank: item.gpapm,
+            earnedCredits: item.hdxf,
+            academicPoints: item.xjf,
+            academicPointsRank: item.xjfpm,
+            totalCredits: item.zxf,
+            courseScope: item.kcfw,
+            collegeName: item.jgmc,
+            majorName: item.zymc,
+            updatedAt: item.czsj
+        )
+    }
+
+    private static func resolveGPAStatisticsRange(
+        startYear: Int?,
+        startSemester: Int?,
+        endYear: Int?,
+        endSemester: Int?
+    ) throws -> (startTermCode: String, endTermCode: String) {
+        let startCode = try gpaStatisticsTermCode(
+            year: startYear,
+            semester: startSemester,
+            label: "起始"
+        )
+        let endCode = try gpaStatisticsTermCode(
+            year: endYear,
+            semester: endSemester,
+            label: "结束"
+        )
+
+        if let startCode, let endCode, startCode > endCode {
+            throw APIError.runtimeError("起始学期不能晚于结束学期。")
+        }
+
+        return (
+            startTermCode: startCode.map(String.init) ?? "",
+            endTermCode: endCode.map(String.init) ?? ""
+        )
+    }
+
+    private static func gpaStatisticsTermCode(
+        year: Int?,
+        semester: Int?,
+        label: String
+    ) throws -> Int? {
+        switch (year, semester) {
+        case (nil, nil):
+            return nil
+        case let (year?, semester?):
+            guard (1...3).contains(semester) else {
+                throw APIError.runtimeError("\(label)学期参数无效，必须是 1（秋）、2（春）或 3（夏）。")
+            }
+
+            let xqm = [3, 12, 16][semester - 1]
+            return year * 100 + xqm
+        default:
+            throw APIError.runtimeError("\(label)学期必须同时提供 year 和 semester。")
+        }
+    }
+
+    private static func gpaStatisticsCommonParameters(
+        startTermCode: String,
+        endTermCode: String
+    ) -> Parameters {
+        [
+            "qsXnxq": startTermCode,
+            "zzXnxq": endTermCode,
+            "tjgx": 0,
+            "alsfj": "",
+            "sspjfblws": 9,
+            "pjjdblws": 9,
+            "bjpjf": gpaStatisticsIgnoredGradeValues,
+            "bjjd": gpaStatisticsIgnoredGradeValues,
+            "kch_ids": gpaStatisticsExcludedCourseIDs,
+            "bcjkc_id": "",
+            "bcjkz_id": "",
+            "cjkz_id": "",
+            "cjxzm": "zhyccj",
+            "kcfw": "hxkc",
+            "tjfw": "njzy",
+            "xjzt": 1
+        ]
+    }
+
+    private static func parseJSONStringResponse(_ data: Data) throws -> String {
+        if let value = try? JSONDecoder().decode(String.self, from: data) {
+            return value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        if let text = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !text.isEmpty {
+            return text.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        }
+
+        throw APIError.internalError
     }
 }
 
@@ -1785,10 +1972,10 @@ struct CanvasAPI {
         guard let cookies else { throw APIError.sessionExpired }
         
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
         
-        let response = try await AF.request("https://oc.sjtu.edu.cn/login/openid_connect")
+        let response = try await AppAF.session.request("https://oc.sjtu.edu.cn/login/openid_connect")
             .serializingString()
             .value
         if response.contains("以下用户没有Canvas") {
@@ -1818,7 +2005,7 @@ struct CanvasAPI {
     func getCSRFToken() throws -> String {
         var csrfToken: String?
         
-        for cookies in AF.session.configuration.httpCookieStorage?.cookies ?? [] {
+        for cookies in AppAF.cookieStorage.cookies ?? [] {
             if cookies.name == "_csrf_token", cookies.domain == "oc.sjtu.edu.cn" {
                 csrfToken = cookies.value.removingPercentEncoding
             }
@@ -1832,7 +2019,7 @@ struct CanvasAPI {
     }
     
     func getTokens() async throws -> [CanvasLMSToken] {
-        let response = try await AF.request("https://oc.sjtu.edu.cn/profile/settings")
+        let response = try await AppAF.session.request("https://oc.sjtu.edu.cn/profile/settings")
             .serializingString()
             .value
         
@@ -1866,7 +2053,7 @@ struct CanvasAPI {
     func deleteToken(tokenId: String) async throws {
         let csrfToken = try getCSRFToken()
         
-        _ = try await AF.request(
+        _ = try await AppAF.session.request(
             "https://oc.sjtu.edu.cn/profile/tokens/\(tokenId)",
             method: .post,
             parameters: [
@@ -1884,7 +2071,7 @@ struct CanvasAPI {
     func regenerateToken(tokenId: String) async throws -> CanvasLMSToken {
         let csrfToken = try getCSRFToken()
         
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://oc.sjtu.edu.cn/profile/tokens/\(tokenId)",
             method: .post,
             parameters: [
@@ -1905,7 +2092,7 @@ struct CanvasAPI {
     func generateToken() async throws -> CanvasLMSToken {
         let csrfToken = try getCSRFToken()
         
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://oc.sjtu.edu.cn/profile/tokens",
             method: .post,
             parameters: [
@@ -2033,7 +2220,7 @@ struct CanvasAPI {
             throw APIError.noAccount
         }
 
-        let response = await AF.request(
+        let response = await AppAF.session.request(
             "https://oc.sjtu.edu.cn/api/v1/users/self/upcoming_events",
             headers: [
                 "Authorization": "Bearer \(token)"
@@ -2052,7 +2239,7 @@ struct CanvasAPI {
             throw APIError.noAccount
         }
         
-        let response = await AF.request(
+        let response = await AppAF.session.request(
             "https://oc.sjtu.edu.cn/api/v1/users/self",
             headers: [
                 "Authorization": "Bearer \(token)"

@@ -13,11 +13,13 @@ struct NativeTabBarController: UIViewControllerRepresentable {
         case home = 0
         case unicode = 1
         case profile = 2
+        case ai = 3
     }
 
     @Binding var selectedIndex: Int
     var displayMode: DisplayMode
     var showsUnicodeTab: Bool
+    let aiChatViewModel: AIChatViewModel
     var onActionTap: () -> Void
 
     private var homeIconName: String {
@@ -25,7 +27,7 @@ struct NativeTabBarController: UIViewControllerRepresentable {
     }
 
     private var visibleTabs: [TabIndex] {
-        showsUnicodeTab ? [.home, .unicode, .profile] : [.home, .profile]
+        showsUnicodeTab ? [.home, .unicode, .profile, .ai] : [.home, .profile, .ai]
     }
 
     func makeCoordinator() -> Coordinator {
@@ -105,6 +107,7 @@ struct NativeTabBarController: UIViewControllerRepresentable {
         private lazy var cachedHomeController = parent.homeController()
         private lazy var cachedUnicodeController = parent.unicodeController()
         private lazy var cachedProfileController = parent.profileController()
+        private lazy var cachedAIController = parent.aiController()
         private var currentHomeIconName: String?
 
         init(parent: NativeTabBarController) {
@@ -120,6 +123,8 @@ struct NativeTabBarController: UIViewControllerRepresentable {
                     cachedUnicodeController
                 case .profile:
                     cachedProfileController
+                case .ai:
+                    cachedAIController
                 }
             }
         }
@@ -191,9 +196,20 @@ struct NativeTabBarController: UIViewControllerRepresentable {
         )
         return profile
     }
+
+    private func aiController() -> UIViewController {
+        let ai = UIHostingController(rootView: AIView(chatViewModel: aiChatViewModel))
+        ai.tabBarItem = UITabBarItem(
+            title: "AI",
+            image: UIImage(systemName: "sparkles"),
+            tag: TabIndex.ai.rawValue
+        )
+        return ai
+    }
 }
 
 struct RootTabView: View {
+    let aiChatViewModel: AIChatViewModel
     let today = Calendar.current.component(.day, from: Date())
     @AppStorage("displayMode") var displayMode: DisplayMode = .day
     @AppStorage("accounts") private var accounts: [WebAuthAccount] = []
@@ -230,6 +246,7 @@ struct RootTabView: View {
         case campusCard
         case bus
         case about
+        case ai
     }
 
     private enum SidebarDestination: Hashable {
@@ -437,6 +454,11 @@ struct RootTabView: View {
                     }
 
                     Section {
+                        Label("AI", systemImage: "sparkles")
+                            .tag(SidebarItem.ai)
+                    }
+
+                    Section {
                         Label("关于", systemImage: "info.circle")
                             .tag(SidebarItem.about)
                     }
@@ -542,6 +564,8 @@ struct RootTabView: View {
             NavigationStack {
                 AboutView()
             }
+        case .ai:
+            AIView(chatViewModel: aiChatViewModel)
         }
     }
 
@@ -552,7 +576,8 @@ struct RootTabView: View {
         NativeTabBarController(
             selectedIndex: $selectedIndex,
             displayMode: displayMode,
-            showsUnicodeTab: shouldShowUnicodeTab
+            showsUnicodeTab: shouldShowUnicodeTab,
+            aiChatViewModel: aiChatViewModel
         ) {
             checkUnicode()
         }
@@ -617,6 +642,6 @@ struct RootTabView: View {
 }
 
 #Preview {
-    RootTabView()
+    RootTabView(aiChatViewModel: AIChatViewModel(config: AIConfig()))
         .accentColor(Color(red: 200 / 255, green: 22 / 255, blue: 30 / 255))
 }

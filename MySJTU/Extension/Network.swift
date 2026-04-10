@@ -7,6 +7,39 @@
 
 import Foundation
 import Network
+import Alamofire
+
+enum AppUserAgent {
+    static let value = "MySJTU"
+}
+
+private struct AppUserAgentInterceptor: RequestInterceptor {
+    func adapt(
+        _ urlRequest: URLRequest,
+        for session: Session,
+        completion: @escaping @Sendable (Result<URLRequest, any Error>) -> Void
+    ) {
+        guard urlRequest.value(forHTTPHeaderField: "User-Agent") == nil else {
+            completion(.success(urlRequest))
+            return
+        }
+
+        var request = urlRequest
+        request.setValue(AppUserAgent.value, forHTTPHeaderField: "User-Agent")
+        completion(.success(request))
+    }
+}
+
+enum AppAF {
+    static let cookieStorage = HTTPCookieStorage.shared
+
+    static let session: Session = {
+        let configuration = URLSessionConfiguration.af.default
+        configuration.httpShouldSetCookies = true
+        configuration.httpCookieStorage = cookieStorage
+        return Session(configuration: configuration, interceptor: AppUserAgentInterceptor())
+    }()
+}
 
 class NetworkMonitor: ObservableObject {
     private let monitor = NWPathMonitor()

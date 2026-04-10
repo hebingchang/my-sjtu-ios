@@ -68,7 +68,7 @@ protocol WebAuthProvider: Codable {
 
 extension AccessToken {
     func refresh() async throws -> Self {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://sjtu.azurewebsites.net/api/refreshtoken",
             method: .post,
             parameters: [
@@ -116,7 +116,7 @@ struct JAccountAuthProvider: WebAuthProvider {
     var cookiesDomains: [String] = ["jaccount.sjtu.edu.cn"]
 
     func getConfig(scopes: [String]) async throws -> OAuthConfig {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://sjtu.azurewebsites.net/api/getoauthconfig",
             method: .post,
             parameters: [
@@ -129,7 +129,7 @@ struct JAccountAuthProvider: WebAuthProvider {
     }
 
     private func authorize(code: String, config: OAuthConfig) async throws -> AccessToken {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://sjtu.azurewebsites.net/api/oauthlogin",
             method: .post,
             parameters: [
@@ -146,7 +146,7 @@ struct JAccountAuthProvider: WebAuthProvider {
     }
 
     func getProfile(token: AccessToken) async throws -> Profile {
-        let profileResponse = try await AF.request(
+        let profileResponse = try await AppAF.session.request(
             "https://api.sjtu.edu.cn/v1/me/profile",
             parameters: [
                 "access_token": token.access_token
@@ -176,9 +176,9 @@ struct JAccountAuthProvider: WebAuthProvider {
         let lessonsConfig = try await self.getConfig(scopes: ["lessons"])
 
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
-        let lessonsAuthorizeResponse = await AF.request(lessonsConfig.authorization_url).serializingData().response
+        let lessonsAuthorizeResponse = await AppAF.session.request(lessonsConfig.authorization_url).serializingData().response
         let query = lessonsAuthorizeResponse.response?.url?.queryDictionary
 
         guard let query = query else {
@@ -212,9 +212,9 @@ struct JAccountAuthProvider: WebAuthProvider {
     
     func checkSession(cookies: [HTTPCookie]) async throws -> WebAuthStatus {
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
-        let response = await AF.request("https://jaccount.sjtu.edu.cn/profile/api/account", method: .head)
+        let response = await AppAF.session.request("https://jaccount.sjtu.edu.cn/profile/api/account", method: .head)
             .serializingData()
             .response
         if let contentType = response.response?.headers.value(for: "content-type") {
@@ -268,10 +268,10 @@ struct SHSMUAuthProvider: WebAuthProvider {
 
     func getProfile(cookies: [HTTPCookie]) async throws -> WebAuthUser {
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
 
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://webvpn2.shsmu.edu.cn/https/77726476706e69737468656265737421f1e25594757e7b586d059ce29d51367b0014/shtyrz/login/toMain.do"
         )
             .serializingString()
@@ -315,9 +315,9 @@ struct SHSMUAuthProvider: WebAuthProvider {
     
     func checkSession(cookies: [HTTPCookie]) async throws -> WebAuthStatus {
         cookies.forEach { cookie in
-            AF.session.configuration.httpCookieStorage?.setCookie(cookie)
+            AppAF.cookieStorage.setCookie(cookie)
         }
-        let response = await AF.request("https://webvpn2.shsmu.edu.cn/", method: .head)
+        let response = await AppAF.session.request("https://webvpn2.shsmu.edu.cn/", method: .head)
             .redirect(using: .doNotFollow)
             .serializingData()
             .response

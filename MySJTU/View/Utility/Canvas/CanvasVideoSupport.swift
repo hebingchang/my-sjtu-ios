@@ -600,7 +600,7 @@ extension CanvasAPI {
             throw CanvasVideoBootstrapError.invalidSessionURL
         }
 
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://oc.sjtu.edu.cn/login/session_token",
             method: .get,
             parameters: [
@@ -619,7 +619,7 @@ extension CanvasAPI {
             throw CanvasVideoBootstrapError.invalidSessionURL
         }
 
-        let sessionResponse = await AF.request(sessionURL)
+        let sessionResponse = await AppAF.session.request(sessionURL)
             .validate()
             .serializingString()
             .response
@@ -666,7 +666,7 @@ extension CanvasAPI {
             throw CanvasVideoBootstrapError.missingTokenID
         }
 
-        let accessTokenResponse = try await AF.request(
+        let accessTokenResponse = try await AppAF.session.request(
             "https://v.sjtu.edu.cn/jy-application-canvas-sjtu/lti3/getAccessTokenByTokenId",
             method: .get,
             parameters: [
@@ -725,7 +725,7 @@ extension CanvasAPI {
             encoding = URLEncoding.default
         }
 
-        return await AF.request(
+        return await AppAF.session.request(
             launchForm.actionURL,
             method: launchForm.method,
             parameters: launchForm.parameters,
@@ -744,7 +744,7 @@ enum CanvasVideoPlatformAPI {
             .addingPercentEncoding(withAllowedCharacters: .rfc3986Unreserved)
             ?? session.canvasCourseID
 
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://v.sjtu.edu.cn/jy-application-canvas-sjtu/directOnDemandPlay/findVodVideoList",
             method: .post,
             parameters: [
@@ -772,7 +772,7 @@ enum CanvasVideoPlatformAPI {
         session: CanvasVideoPlatformSession,
         videoId: String
     ) async throws -> CanvasVideoInfo {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://v.sjtu.edu.cn/jy-application-canvas-sjtu/directOnDemandPlay/getVodVideoInfos",
             method: .post,
             parameters: [
@@ -803,7 +803,7 @@ enum CanvasVideoPlatformAPI {
             .addingPercentEncoding(withAllowedCharacters: .rfc3986Unreserved)
             ?? session.canvasCourseID
 
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://v.sjtu.edu.cn/jy-application-canvas-sjtu/directOnDemandPlay/findLiveList",
             method: .post,
             parameters: CanvasLiveVideoListRequest(canvasCourseId: encodedCanvasCourseID),
@@ -830,7 +830,7 @@ enum CanvasVideoPlatformAPI {
         session: CanvasVideoPlatformSession,
         liveId: String
     ) async throws -> CanvasLiveVideoInfo {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://v.sjtu.edu.cn/jy-application-canvas-sjtu/directOnDemandPlay/getLiveVideoInfos",
             method: .post,
             parameters: [
@@ -860,7 +860,7 @@ enum CanvasVideoPlatformAPI {
         session: CanvasVideoPlatformSession,
         courseId: Int
     ) async throws -> CanvasVideoCourseSummary? {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://v.sjtu.edu.cn/jy-application-canvas-sjtu/course/summary/canvas/detail",
             method: .post,
             parameters: CanvasVideoCourseDetailRequest(courseId: courseId),
@@ -882,7 +882,7 @@ enum CanvasVideoPlatformAPI {
         session: CanvasVideoPlatformSession,
         courseId: Int
     ) async throws -> CanvasVideoTranscriptPayload? {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://v.sjtu.edu.cn/jy-application-canvas-sjtu/transfer/translate/detail",
             method: .post,
             parameters: CanvasVideoCourseDetailRequest(courseId: courseId),
@@ -904,7 +904,7 @@ enum CanvasVideoPlatformAPI {
         session: CanvasVideoPlatformSession,
         courseId: Int
     ) async throws -> [CanvasVideoPPTSlide] {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://v.sjtu.edu.cn/jy-application-canvas-sjtu/directOnDemandPlay/vod-analysis/query-ppt-slice-es",
             method: .get,
             parameters: [
@@ -929,7 +929,7 @@ enum CanvasVideoPlatformAPI {
         courseId: Int,
         spriteIndex: Int
     ) async throws -> URL {
-        let response = try await AF.request(
+        let response = try await AppAF.session.request(
             "https://v.sjtu.edu.cn/jy-application-canvas-sjtu/sprite-image/get/ivs/\(courseId)/\(spriteIndex)",
             method: .get,
             headers: session.headers()

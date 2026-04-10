@@ -9,10 +9,12 @@ import SwiftUI
 import WidgetKit
 
 @main
-struct MySJTUApp: App {
+struct MySJTUApp: App {    
     @Environment(\.scenePhase) private var scenePhase
     @StateObject var progressor: Progressor = Progressor()
     @StateObject var appConfig: AppConfig = AppConfig(appStatus: .normal)
+    @StateObject private var aiChatViewModel = AIChatViewModel(config: Self.initialAIConfig())
+    @StateObject private var toolNotificationAlertCenter = ToolNotificationAlertCenter.shared
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var networkMonitor = NetworkMonitor()
 
@@ -42,6 +44,18 @@ struct MySJTUApp: App {
                         }
                     }
                     UserDefaults.standard.set(accounts.rawValue, forKey: "accounts")
+
+                    if let configRaw = UserDefaults.standard.string(forKey: "aiConfig"),
+                       let config = AIConfig(rawValue: configRaw),
+                       config.isEnabled,
+                       config.provider == .chatSJTU,
+                       let jAccount = accounts.first(where: { $0.provider == .jaccount && $0.status == .connected }) {
+                        do {
+                            try await AIService.refreshChatSJTUToken(cookies: jAccount.cookies)
+                        } catch {
+                            print("AI token refresh failed: \(error)")
+                        }
+                    }
                 }
             }
         }
@@ -49,9 +63,10 @@ struct MySJTUApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            RootTabView(aiChatViewModel: aiChatViewModel)
                 .environmentObject(progressor)
                 .environmentObject(appConfig)
+                .environmentObject(toolNotificationAlertCenter)
                 .onAppear {
                     UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = UIColor(named: "AccentColor")
                 }
@@ -61,10 +76,14 @@ struct MySJTUApp: App {
                 }
                 .task {
                     Connectivity.shared.sendLatestScheduleSnapshot()
+                    await ToolNotificationService.shared.cleanupExpiredPersistedNotifications()
                 }
                 .onChange(of: scenePhase) {
                     if scenePhase == .active {
                         Connectivity.shared.sendLatestScheduleSnapshot()
+                        Task {
+                            await ToolNotificationService.shared.cleanupExpiredPersistedNotifications()
+                        }
                     }
                 }
                 .onChange(of: networkMonitor.isConnected) {
@@ -107,6 +126,15 @@ struct MySJTUApp: App {
                         }
                     }
                 }
+                .alert(item: $toolNotificationAlertCenter.activeAlert) { alert in
+                    Alert(
+                        title: Text(alert.title),
+                        message: Text(alert.body),
+                        dismissButton: .default(Text("知道了")) {
+                            toolNotificationAlertCenter.dismiss()
+                        }
+                    )
+                }
         }
         .databaseContext(.readWrite {
             guard let pool = Eloquent.pool else {
@@ -115,6 +143,15 @@ struct MySJTUApp: App {
             
             return pool
         })
+    }
+
+    private static func initialAIConfig() -> AIConfig {
+        guard let rawValue = UserDefaults.standard.string(forKey: "aiConfig"),
+              let config = AIConfig(rawValue: rawValue) else {
+            return AIConfig()
+        }
+
+        return config
     }
 }
 
