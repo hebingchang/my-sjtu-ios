@@ -156,6 +156,14 @@ struct ExamView: View {
                 .scrollContentBackground(.hidden)
             }
         }
+        .analyticsScreen(
+            "exam_grade",
+            screenClass: "ExamView",
+            parameters: [
+                "semester_loaded": selectedSemester != nil,
+                "acct_count": accounts.count
+            ]
+        )
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: availableSemesters, initial: true) {
             for semester in availableSemesters {
@@ -167,6 +175,13 @@ struct ExamView: View {
         }
         .onChange(of: selectedSemester) {
             if let selectedSemester {
+                AnalyticsService.logEvent(
+                    "exam_semester_selected",
+                    parameters: [
+                        "year": selectedSemester.year,
+                        "term": selectedSemester.semester
+                    ]
+                )
                 loading = true
                 Task {
                     do {

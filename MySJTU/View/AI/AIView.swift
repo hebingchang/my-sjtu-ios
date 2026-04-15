@@ -40,6 +40,16 @@ struct AIView: View {
                     noConfigView
                 }
             }
+            .analyticsScreen(
+                "ai_home",
+                screenClass: "AIView",
+                parameters: [
+                    "ai_ready": hasValidConfig,
+                    "has_stored_cfg": hasStoredConfig,
+                    "ai_provider": aiConfig.provider?.rawValue ?? "none",
+                    "tool_support": aiConfig.capabilities.supportsToolCalling ?? false
+                ]
+            )
             .modifier(AINavigationBarModifier(subtitle: navigationSubtitle))
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $isShowingSettings) {
@@ -107,6 +117,13 @@ struct AIView: View {
             return
         }
 
+        AnalyticsService.logEvent(
+            "ai_settings_opened",
+            parameters: [
+                "ai_ready": hasValidConfig,
+                "ai_provider": aiConfig.provider?.rawValue ?? "none"
+            ]
+        )
         dismissKeyboard()
 
         Task { @MainActor in
@@ -116,6 +133,13 @@ struct AIView: View {
     }
 
     private func startNewConversation() {
+        AnalyticsService.logEvent(
+            "ai_conversation_reset",
+            parameters: [
+                "ai_provider": aiConfig.provider?.rawValue ?? "none",
+                "tool_support": aiConfig.capabilities.supportsToolCalling ?? false
+            ]
+        )
         dismissKeyboard()
         chatViewModel.resetConversation(using: aiConfig)
     }

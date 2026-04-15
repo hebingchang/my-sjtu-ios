@@ -387,6 +387,15 @@ struct AISettingsView: View {
                 }
             }
         }
+        .analyticsScreen(
+            "ai_settings",
+            screenClass: "AISettingsView",
+            parameters: [
+                "enabled": isEnabled,
+                "provider": selectedProvider.rawValue,
+                "has_model": !resolvedModelId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ]
+        )
         .navigationTitle("AI 设置")
         .navigationBarTitleDisplayMode(.inline)
         .alert("错误", isPresented: $showError) {

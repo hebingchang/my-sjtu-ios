@@ -294,6 +294,14 @@ struct SelfStudyClassroomView: View {
                 .transition(.opacity)
             }
         }
+        .analyticsScreen(
+            "self_study_rooms",
+            screenClass: "SelfStudyClassroomView",
+            parameters: [
+                "campus_count": campuses.count,
+                "building_selected": selectedBuildingID != nil
+            ]
+        )
         .navigationTitle("自习教室")
         .searchable(
             text: $searchText,
@@ -306,6 +314,13 @@ struct SelfStudyClassroomView: View {
             await loadInitialData()
         }
         .onChange(of: selectedCampusID) {
+            AnalyticsService.logEvent(
+                "self_study_filter_changed",
+                parameters: [
+                    "filter": "campus",
+                    "has_value": selectedCampusID != nil
+                ]
+            )
             syncSelectedBuildingWithCampus()
         }
         .onChange(of: selectedBuildingID) {
@@ -313,6 +328,13 @@ struct SelfStudyClassroomView: View {
                 return
             }
 
+            AnalyticsService.logEvent(
+                "self_study_filter_changed",
+                parameters: [
+                    "filter": "building",
+                    "has_value": selectedBuildingID != nil
+                ]
+            )
             Task {
                 await loadBuildingSnapshot()
             }

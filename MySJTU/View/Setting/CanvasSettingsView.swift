@@ -61,6 +61,13 @@ struct CanvasSettingsView: View {
                 }
             }
         }
+        .analyticsScreen(
+            "canvas_settings",
+            screenClass: "CanvasSettingsView",
+            parameters: [
+                "has_token": canvasToken != nil
+            ]
+        )
         .navigationTitle("Canvas")
         .navigationBarTitleDisplayMode(.inline)
         .alert("已复制 Canvas 令牌", isPresented: $showCopySuccessAlert) {
@@ -77,6 +84,12 @@ struct CanvasSettingsView: View {
         }
 
         UIPasteboard.general.string = canvasToken
+        AnalyticsService.logEvent(
+            "canvas_token_copied",
+            parameters: [
+                "has_token": true
+            ]
+        )
         showCopySuccessAlert = true
     }
 }
@@ -174,6 +187,14 @@ struct CanvasCourseMatchingSettingsView: View {
                 }
             }
         }
+        .analyticsScreen(
+            "canvas_course_matching",
+            screenClass: "CanvasCourseMatchingSettingsView",
+            parameters: [
+                "local_course_count": filteredLocalCourses.count,
+                "canvas_course_count": canvasCourses.count
+            ]
+        )
         .navigationTitle("课程匹配")
         .navigationBarTitleDisplayMode(.inline)
         .task {

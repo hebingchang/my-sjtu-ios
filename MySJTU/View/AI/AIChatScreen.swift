@@ -157,6 +157,15 @@ struct AIChatScreen: View {
             }
         }
         .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+        .analyticsScreen(
+            "ai_chat",
+            screenClass: "AIChatScreen",
+            parameters: [
+                "ai_provider": config.provider?.rawValue ?? "none",
+                "tool_support": config.capabilities.supportsToolCalling ?? false,
+                "msg_count": viewModel.messages.count
+            ]
+        )
         .task(id: currentUserAvatarURL) {
             await loadUserAvatarIfNeeded()
         }
@@ -172,6 +181,12 @@ struct AIChatScreen: View {
                     sendMessage()
                 },
                 onStop: {
+                    AnalyticsService.logEvent(
+                        "ai_stream_cancelled",
+                        parameters: [
+                            "ai_provider": config.provider?.rawValue ?? "none"
+                        ]
+                    )
                     viewModel.cancelStreaming()
                 }
             )
@@ -196,18 +211,62 @@ struct AIChatScreen: View {
         .onAppear {
             viewModel.toolPermissionStore = $toolPermissionStore
         }
+        .onChange(of: viewModel.pendingToolPermission) { _, request in
+            guard let request else {
+                return
+            }
+
+            AnalyticsService.logEvent(
+                "ai_tool_permission",
+                parameters: [
+                    "status": "prompted",
+                    "tool_name": request.toolName,
+                    "provider": AIToolPermissionStore.providerDisplayName(for: request.baseURL)
+                ]
+            )
+        }
         .alert(
             "工具调用请求",
             isPresented: $viewModel.showToolPermissionDialog
         ) {
             if viewModel.pendingToolPermission != nil {
                 Button("始终允许") {
+                    if let request = viewModel.pendingToolPermission {
+                        AnalyticsService.logEvent(
+                            "ai_tool_permission",
+                            parameters: [
+                                "status": "always_allow",
+                                "tool_name": request.toolName,
+                                "provider": AIToolPermissionStore.providerDisplayName(for: request.baseURL)
+                            ]
+                        )
+                    }
                     viewModel.resolveToolPermission(.alwaysAllow)
                 }
                 Button("允许一次") {
+                    if let request = viewModel.pendingToolPermission {
+                        AnalyticsService.logEvent(
+                            "ai_tool_permission",
+                            parameters: [
+                                "status": "allow_once",
+                                "tool_name": request.toolName,
+                                "provider": AIToolPermissionStore.providerDisplayName(for: request.baseURL)
+                            ]
+                        )
+                    }
                     viewModel.resolveToolPermission(.allowOnce)
                 }
                 Button("不允许", role: .cancel) {
+                    if let request = viewModel.pendingToolPermission {
+                        AnalyticsService.logEvent(
+                            "ai_tool_permission",
+                            parameters: [
+                                "status": "denied",
+                                "tool_name": request.toolName,
+                                "provider": AIToolPermissionStore.providerDisplayName(for: request.baseURL)
+                            ]
+                        )
+                    }
                     viewModel.resolveToolPermission(.deny)
                 }
             }
@@ -311,12 +370,21 @@ struct AIChatScreen: View {
         .padding(.horizontal, 20)
     }
 
-    private func sendMessage() {
+    private func sendMessage(source: String = "composer") {
         let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedDraft.isEmpty else {
             return
         }
 
+        AnalyticsService.logEvent(
+            "ai_message_sent",
+            parameters: [
+                "source": source,
+                "len_bucket": AnalyticsService.messageLengthBucket(for: trimmedDraft),
+                "ai_provider": config.provider?.rawValue ?? "none",
+                "tool_support": config.capabilities.supportsToolCalling ?? false
+            ]
+        )
         shouldAutoScrollToBottom = true
         draft = ""
         viewModel.updateConfig(config)
@@ -330,7 +398,7 @@ struct AIChatScreen: View {
         }
 
         draft = prompt
-        sendMessage()
+        sendMessage(source: "quick_prompt")
     }
 
     @ViewBuilder

@@ -202,6 +202,13 @@ struct NotificationView: View {
             guard let url = item.url else {
                 return
             }
+            AnalyticsService.logEvent(
+                "notification_opened",
+                parameters: [
+                    "has_summary": !item.summary.isEmpty,
+                    "host": url.host() ?? "unknown"
+                ]
+            )
             selectedURL = IdentifiableURL(id: url)
         } label: {
             HStack(alignment: .top, spacing: 12) {
@@ -378,17 +385,33 @@ struct NotificationView: View {
         do {
             let feedItems = try await fetchItems(limit: requestedItemCount)
                 .map(mapItem)
-            
+
             dailyFeeds = groupByDate(feedItems)
             hasMore = feedItems.count >= requestedItemCount
             lastUpdatedAt = .now
             loadErrorMessage = nil
+            AnalyticsService.logEvent(
+                "notification_feed_load",
+                parameters: [
+                    "status": "success",
+                    "limit": requestedItemCount,
+                    "item_count": feedItems.count
+                ]
+            )
         } catch {
             if dailyFeeds.isEmpty {
                 loadErrorMessage = "加载失败，请稍后重试"
             } else {
                 loadErrorMessage = "更新失败，已显示上次结果"
             }
+            AnalyticsService.logEvent(
+                "notification_feed_load",
+                parameters: [
+                    "status": "failed",
+                    "limit": requestedItemCount,
+                    "error_type": AnalyticsService.errorTypeName(error)
+                ]
+            )
         }
     }
     
@@ -415,8 +438,24 @@ struct NotificationView: View {
             hasMore = feedItems.count >= nextCount && feedItems.count > previousCount
             lastUpdatedAt = .now
             loadErrorMessage = nil
+            AnalyticsService.logEvent(
+                "notification_feed_load_more",
+                parameters: [
+                    "status": "success",
+                    "limit": nextCount,
+                    "item_count": feedItems.count
+                ]
+            )
         } catch {
             loadErrorMessage = "加载更多失败，请稍后重试"
+            AnalyticsService.logEvent(
+                "notification_feed_load_more",
+                parameters: [
+                    "status": "failed",
+                    "limit": nextCount,
+                    "error_type": AnalyticsService.errorTypeName(error)
+                ]
+            )
         }
     }
 
@@ -458,6 +497,13 @@ struct NotificationView: View {
         .task {
             await loadFeed(showsLoading: true, resetPagination: true)
         }
+        .analyticsScreen(
+            "academic_notifications",
+            screenClass: "NotificationView",
+            parameters: [
+                "loaded_count": totalFeedCount
+            ]
+        )
         .animation(.easeInOut(duration: 0.2), value: loading)
         .animation(.easeInOut(duration: 0.2), value: dailyFeeds.count)
         .navigationTitle("教务通知")

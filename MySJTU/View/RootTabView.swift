@@ -298,20 +298,100 @@ struct RootTabView: View {
 
     private func checkUnicode(alert: Bool = true) {
         if appConfig.appStatus == .review {
+            AnalyticsService.logEvent(
+                "unicode_entry",
+                parameters: [
+                    "result": "opened",
+                    "source": "review_mode"
+                ]
+            )
             isUnicodePresented = true
             return
         }
 
         if let sjtuAccount = accounts.first(where: { $0.provider == .jaccount }) {
             if sjtuAccount.enabledFeatures.contains(.unicode) {
+                AnalyticsService.logEvent(
+                    "unicode_entry",
+                    parameters: [
+                        "result": "opened",
+                        "source": "authorized"
+                    ]
+                )
                 isUnicodePresented = true
             } else if alert {
+                AnalyticsService.logEvent(
+                    "unicode_entry",
+                    parameters: [
+                        "result": "blocked",
+                        "reason": "no_permission"
+                    ]
+                )
                 inSetting = true
                 showNoPermission = true
             }
         } else if alert {
+            AnalyticsService.logEvent(
+                "unicode_entry",
+                parameters: [
+                    "result": "blocked",
+                    "reason": "no_account"
+                ]
+            )
             inSetting = true
             showNoAccountAlert = true
+        }
+    }
+
+    private func tabName(for logicalIndex: Int) -> String {
+        switch logicalIndex {
+        case 0:
+            return "schedule"
+        case 1 where shouldShowUnicodeTab:
+            return "unicode"
+        case 2 where shouldShowUnicodeTab:
+            return "profile"
+        case 3 where shouldShowUnicodeTab:
+            return "ai"
+        case 1:
+            return "profile"
+        case 2:
+            return "ai"
+        default:
+            return "unknown"
+        }
+    }
+
+    private func sidebarItemName(_ item: SidebarItem?) -> String {
+        switch item {
+        case .schedule:
+            return "schedule"
+        case .accounts:
+            return "accounts"
+        case .dataSource:
+            return "data_source"
+        case .customize:
+            return "customize"
+        case .canvasSettings:
+            return "canvas_settings"
+        case .canvasEvents:
+            return "canvas_events"
+        case .notifications:
+            return "notifications"
+        case .selfStudyClassroom:
+            return "self_study"
+        case .exams:
+            return "exams"
+        case .campusCard:
+            return "campus_card"
+        case .bus:
+            return "bus"
+        case .about:
+            return "about"
+        case .ai:
+            return "ai"
+        case .none:
+            return "none"
         }
     }
 
@@ -367,17 +447,47 @@ struct RootTabView: View {
                 checkUnicode(alert: false)
             }
         }
+        .onAppear {
+            AnalyticsService.logEvent(
+                "navigation_selected",
+                parameters: [
+                    "layout": shouldUseSidebarLayout ? "sidebar" : "tab",
+                    "destination": shouldUseSidebarLayout ? sidebarItemName(selectedSidebarItem) : tabName(for: selectedIndex)
+                ]
+            )
+        }
         .task {
             if qaManager.quickAction == .unicode {
+                AnalyticsService.logEvent(
+                    "quick_action_used",
+                    parameters: ["action": "unicode"]
+                )
                 qaManager.quickAction = nil
                 checkUnicode()
             }
         }
         .onChange(of: scenePhase) {
             if qaManager.quickAction == .unicode {
+                AnalyticsService.logEvent(
+                    "quick_action_used",
+                    parameters: ["action": "unicode"]
+                )
                 qaManager.quickAction = nil
                 checkUnicode()
             }
+        }
+        .onChange(of: selectedIndex) {
+            guard !shouldUseSidebarLayout else {
+                return
+            }
+
+            AnalyticsService.logEvent(
+                "navigation_selected",
+                parameters: [
+                    "layout": "tab",
+                    "destination": tabName(for: selectedIndex)
+                ]
+            )
         }
         .onChange(of: selectedSidebarItem) { _, newValue in
             if newValue != .bus, !sidebarPath.isEmpty {
@@ -386,6 +496,18 @@ struct RootTabView: View {
             if newValue != .bus {
                 resetBusSidebarSelection()
             }
+
+            guard shouldUseSidebarLayout else {
+                return
+            }
+
+            AnalyticsService.logEvent(
+                "navigation_selected",
+                parameters: [
+                    "layout": "sidebar",
+                    "destination": sidebarItemName(newValue)
+                ]
+            )
         }
         .onChange(of: sidebarPath) { _, newValue in
             syncBusSidebarSelection(with: newValue)

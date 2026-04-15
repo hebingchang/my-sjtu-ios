@@ -88,6 +88,13 @@ struct CampusCardListView: View {
                 }
             }
         }
+        .analyticsScreen(
+            "campus_card_list",
+            screenClass: "CampusCardListView",
+            parameters: [
+                "card_count": cards.count
+            ]
+        )
         .animation(.easeInOut, value: loading)
         .navigationTitle("校园卡")
         .task {
@@ -96,8 +103,22 @@ struct CampusCardListView: View {
                     let api = SJTUOpenAPI(tokens: account.tokens)
                     let profile = try await api.getProfile()
                     cards = addCardType(cards: try await api.getCampusCards(), profile: profile)
+                    AnalyticsService.logEvent(
+                        "campus_card_load",
+                        parameters: [
+                            "status": "success",
+                            "card_count": cards.count
+                        ]
+                    )
                 } catch {
                     print(error)
+                    AnalyticsService.logEvent(
+                        "campus_card_load",
+                        parameters: [
+                            "status": "failed",
+                            "error_type": AnalyticsService.errorTypeName(error)
+                        ]
+                    )
                 }
             }
             loading = false

@@ -485,18 +485,48 @@ struct AccountView: View {
         }
     }
 
-    var body: some View {
-        if currentAccount == nil && !deleting {
-            SignInView(provider: provider) { account in
-                withAnimation {
-                    accounts.append(account)
-                }
-            }
-        } else if let account = currentAccount {
-            accountList(account)
-        } else {
-            ProgressView()
+    private func logFeatureEvent(
+        feature: Feature,
+        status: String,
+        targetEnabled: Bool,
+        error: Error? = nil
+    ) {
+        var parameters: [String: Any] = [
+            "provider": provider.analyticsValue,
+            "feature": feature.analyticsValue,
+            "status": status,
+            "target_enabled": targetEnabled
+        ]
+
+        if let error {
+            parameters["error_type"] = AnalyticsService.errorTypeName(error)
         }
+
+        AnalyticsService.logEvent("account_feature_toggle", parameters: parameters)
+    }
+
+    var body: some View {
+        Group {
+            if currentAccount == nil && !deleting {
+                SignInView(provider: provider) { account in
+                    withAnimation {
+                        accounts.append(account)
+                    }
+                }
+            } else if let account = currentAccount {
+                accountList(account)
+            } else {
+                ProgressView()
+            }
+        }
+        .analyticsScreen(
+            "account_settings",
+            screenClass: "AccountView",
+            parameters: [
+                "provider": provider.analyticsValue,
+                "signed_in": currentAccount != nil
+            ]
+        )
     }
 
     private func accountList(_ account: WebAuthAccount) -> some View {
@@ -543,6 +573,7 @@ struct AccountView: View {
                 removeCanvasFeatureLocally(for: account.provider)
                 featureLoading[.canvas] = false
                 finalizeFeatureToggle(.canvas)
+                logFeatureEvent(feature: .canvas, status: "disabled_local", targetEnabled: false)
             }
             Button("是", role: .destructive) {
                 revokeCanvasFeature(for: account)
@@ -734,6 +765,12 @@ struct AccountView: View {
 
     private func signOutButton(_ account: WebAuthAccount) -> some View {
         Button {
+            AnalyticsService.logEvent(
+                "account_signout",
+                parameters: [
+                    "provider": account.provider.analyticsValue
+                ]
+            )
             deleting = true
             HTTPCookieStorage.shared.removeCookies(since: Date.distantPast)
             accounts.removeAll(where: { $0.provider == account.provider })
@@ -795,6 +832,11 @@ struct AccountView: View {
         provider: Provider,
         previousValue: Bool
     ) {
+        logFeatureEvent(
+            feature: feature,
+            status: "requested",
+            targetEnabled: isEnabled
+        )
         if isEnabled {
             enableFeature(feature, provider: provider, previousValue: previousValue)
         } else {
@@ -804,6 +846,7 @@ struct AccountView: View {
 
     private func enableFeature(_ feature: Feature, provider: Provider, previousValue: Bool) {
         guard let index = accountIndex(for: provider) else {
+            logFeatureEvent(feature: feature, status: "no_account", targetEnabled: true)
             rollbackFeatureToggle(feature, to: previousValue)
             return
         }
@@ -823,9 +866,11 @@ struct AccountView: View {
                     try await api.openIdConnect()
                     appendFeature(.examAndGrade, for: provider)
                     finalizeFeatureToggle(.examAndGrade)
+                    logFeatureEvent(feature: .examAndGrade, status: "success", targetEnabled: true)
                 } catch {
                     featureError = "无法登录教学信息服务网"
                     presentError = true
+                    logFeatureEvent(feature: .examAndGrade, status: "failed", targetEnabled: true, error: error)
                     rollbackFeatureToggle(.examAndGrade, to: previousValue)
                 }
             }
@@ -840,14 +885,17 @@ struct AccountView: View {
                     if unicode.status == -1 {
                         featureError = "当前 jAccount 没有开通思源码"
                         presentError = true
+                        logFeatureEvent(feature: .unicode, status: "unavailable", targetEnabled: true)
                         rollbackFeatureToggle(.unicode, to: previousValue)
                     } else {
                         appendFeature(.unicode, for: provider)
                         finalizeFeatureToggle(.unicode)
+                        logFeatureEvent(feature: .unicode, status: "success", targetEnabled: true)
                     }
                 } catch {
                     featureError = "获取思源码状态时发生错误"
                     presentError = true
+                    logFeatureEvent(feature: .unicode, status: "failed", targetEnabled: true, error: error)
                     rollbackFeatureToggle(.unicode, to: previousValue)
                 }
             }
@@ -862,14 +910,17 @@ struct AccountView: View {
                     if cards.isEmpty {
                         featureError = "当前 jAccount 没有关联的校园卡"
                         presentError = true
+                        logFeatureEvent(feature: .campusCard, status: "unavailable", targetEnabled: true)
                         rollbackFeatureToggle(.campusCard, to: previousValue)
                     } else {
                         appendFeature(.campusCard, for: provider)
                         finalizeFeatureToggle(.campusCard)
+                        logFeatureEvent(feature: .campusCard, status: "success", targetEnabled: true)
                     }
                 } catch {
                     featureError = "获取校园卡信息时发生错误"
                     presentError = true
+                    logFeatureEvent(feature: .campusCard, status: "failed", targetEnabled: true, error: error)
                     rollbackFeatureToggle(.campusCard, to: previousValue)
                 }
             }
@@ -877,11 +928,13 @@ struct AccountView: View {
         default:
             appendFeature(feature, for: provider)
             finalizeFeatureToggle(feature)
+            logFeatureEvent(feature: feature, status: "success", targetEnabled: true)
         }
     }
 
     private func disableFeature(_ feature: Feature, provider: Provider, previousValue: Bool) {
         guard let index = accountIndex(for: provider) else {
+            logFeatureEvent(feature: feature, status: "no_account", targetEnabled: false)
             rollbackFeatureToggle(feature, to: previousValue)
             return
         }
@@ -893,6 +946,7 @@ struct AccountView: View {
         default:
             accounts[index].enabledFeatures.removeAll { $0 == feature }
             finalizeFeatureToggle(feature)
+            logFeatureEvent(feature: feature, status: "success", targetEnabled: false)
         }
     }
 
@@ -910,8 +964,10 @@ struct AccountView: View {
         let isCanvasEnabled = accounts.first(where: { $0.provider == provider })?.enabledFeatures.contains(.canvas) == true
         if isCanvasEnabled {
             finalizeFeatureToggle(.canvas)
+            logFeatureEvent(feature: .canvas, status: "success", targetEnabled: true)
         } else {
             rollbackFeatureToggle(.canvas, to: previousValue)
+            logFeatureEvent(feature: .canvas, status: "cancelled", targetEnabled: true)
         }
     }
 
@@ -1017,15 +1073,18 @@ struct AccountView: View {
                 let token = try await createCanvasToken(account: account)
                 accounts[index].bizData["canvas_token"] = token
                 NSUbiquitousKeyValueStore.default.set(token, forKey: canvasTokenStoreKey(for: account))
+                logFeatureEvent(feature: .canvas, status: "success", targetEnabled: true)
             } catch APIError.noAccount {
                 featureError = "当前 jAccount 没有有效的 Canvas 账户"
                 presentError = true
                 removeCanvasFeatureLocally(for: account.provider)
+                logFeatureEvent(feature: .canvas, status: "no_account", targetEnabled: true)
             } catch {
                 print(error)
                 featureError = "由于未知错误，无法登录到 Canvas"
                 presentError = true
                 removeCanvasFeatureLocally(for: account.provider)
+                logFeatureEvent(feature: .canvas, status: "failed", targetEnabled: true, error: error)
             }
         }
     }
@@ -1041,8 +1100,10 @@ struct AccountView: View {
                 NSUbiquitousKeyValueStore.default.removeObject(forKey: canvasTokenStoreKey(for: account))
                 accounts[index].bizData.removeValue(forKey: "canvas_token")
                 accounts[index].enabledFeatures.removeAll { $0 == .canvas }
+                logFeatureEvent(feature: .canvas, status: "success", targetEnabled: false)
             } catch {
                 print(error)
+                logFeatureEvent(feature: .canvas, status: "failed", targetEnabled: false, error: error)
             }
 
             featureLoading[.canvas] = false

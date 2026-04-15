@@ -29,14 +29,43 @@ struct SignInView: View {
             ProgressView()
         }
         .padding()
+        .analyticsScreen(
+            "signin_flow",
+            screenClass: "SignInView",
+            parameters: [
+                "provider": provider.analyticsValue
+            ]
+        )
         .task {
+            AnalyticsService.logEvent(
+                "signin_flow",
+                parameters: [
+                    "status": "started",
+                    "provider": provider.analyticsValue
+                ]
+            )
             do {
                 // authConfig = try await provider.get().getConfig(scopes: ["unicode", "card_info", "card_transactions", "write_card_info", "privacy"])
                 authConfig = try await provider.get().getConfig(scopes: [])
                 stage = .waitingForWebView
                 showWebView = true
+                AnalyticsService.logEvent(
+                    "signin_flow",
+                    parameters: [
+                        "status": "config_loaded",
+                        "provider": provider.analyticsValue
+                    ]
+                )
             } catch {
                 print(error)
+                AnalyticsService.logEvent(
+                    "signin_flow",
+                    parameters: [
+                        "status": "config_failed",
+                        "provider": provider.analyticsValue,
+                        "error_type": AnalyticsService.errorTypeName(error)
+                    ]
+                )
                 self.dismiss()
             }
         }
@@ -44,9 +73,25 @@ struct SignInView: View {
             Task {
                 do {
                     let account = try await provider.get().authenticate(code: code, cookies: cookies, config: authConfig!)
+                    AnalyticsService.logEvent(
+                        "signin_flow",
+                        parameters: [
+                            "status": "completed",
+                            "provider": provider.analyticsValue,
+                            "acct_status": account.status.analyticsValue
+                        ]
+                    )
                     onSuccess?(account)
                 } catch {
                     print(error)
+                    AnalyticsService.logEvent(
+                        "signin_flow",
+                        parameters: [
+                            "status": "auth_failed",
+                            "provider": provider.analyticsValue,
+                            "error_type": AnalyticsService.errorTypeName(error)
+                        ]
+                    )
                     self.dismiss()
                 }
             }
@@ -65,6 +110,13 @@ struct SignInView: View {
                 redirectUrl: URL(string: authConfig!.redirect_url)!,
                 cookiesDomains: provider.get().cookiesDomains,
                 onRedirect: { (_, cookies, code) in
+                    AnalyticsService.logEvent(
+                        "signin_flow",
+                        parameters: [
+                            "status": "callback_received",
+                            "provider": provider.analyticsValue
+                        ]
+                    )
                     self.code = code
                     self.cookies = cookies
                     stage = .exchangeToken

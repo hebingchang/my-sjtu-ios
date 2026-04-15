@@ -31,6 +31,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseApp.configure()
+        AnalyticsService.configure()
+        AnalyticsService.logEvent(
+            "session_started",
+            parameters: [
+                "launch_source": launchOptions?[.shortcutItem] == nil ? "default" : "shortcut"
+            ]
+        )
         UNUserNotificationCenter.current().delegate = self
 
         return true

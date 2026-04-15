@@ -341,6 +341,13 @@ struct BusListView: View {
             }
         }
         .background(Color.systemGroupedBackground)
+        .analyticsScreen(
+            "campus_bus",
+            screenClass: "BusListView",
+            parameters: [
+                "sidebar_mode": usesSidebarNavigation
+            ]
+        )
         .navigationTitle("校园巴士")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(!usesSidebarNavigation)
@@ -371,6 +378,32 @@ struct BusListView: View {
         }
         .onChange(of: sidebarLineDetailToken) { _, _ in
             syncSidebarSelectionIfNeeded()
+        }
+        .onChange(of: presentedStation) { _, station in
+            guard let station else {
+                return
+            }
+
+            AnalyticsService.logEvent(
+                "bus_station_opened",
+                parameters: [
+                    "station_id": station.id,
+                    "sidebar_mode": usesSidebarNavigation
+                ]
+            )
+        }
+        .onChange(of: presentedLineDetail) { _, selection in
+            guard let selection else {
+                return
+            }
+
+            AnalyticsService.logEvent(
+                "bus_line_opened",
+                parameters: [
+                    "line_id": selection.id,
+                    "sidebar_mode": usesSidebarNavigation
+                ]
+            )
         }
         .onDisappear {
             cancelLineDetailTask()

@@ -120,5 +120,13 @@ struct ProfileView: View {
             .navigationBarTitle("我的")
             .toolbar(hideTabBar ? .hidden : .automatic, for: .tabBar)
         }
+        .analyticsScreen(
+            "profile_hub",
+            screenClass: "ProfileView",
+            parameters: [
+                "acct_count": accounts.count,
+                "app_status": appConfig.appStatus.analyticsValue
+            ]
+        )
     }
 }

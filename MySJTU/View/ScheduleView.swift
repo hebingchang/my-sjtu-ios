@@ -188,6 +188,50 @@ struct ScheduleViewTitle: View {
 
     @Namespace private var namespace
 
+    private func analyticsCollegeName(_ college: College) -> String {
+        switch college {
+        case .sjtu:
+            return "sjtu"
+        case .sjtug:
+            return "sjtug"
+        case .joint:
+            return "joint"
+        case .shsmu:
+            return "shsmu"
+        }
+    }
+
+    private func logImportStarted(source: String) {
+        AnalyticsService.logEvent(
+            "schedule_import",
+            parameters: [
+                "status": "started",
+                "source": source,
+                "college": analyticsCollegeName(college),
+                "day_offset": AnalyticsService.dayOffsetFromToday(for: selectedDay),
+                "disp_mode": displayMode == .day ? "day" : "week",
+                "dual_college": showBothCollege
+            ]
+        )
+    }
+
+    private func logImportFinished(source: String, status: String, error: Error? = nil) {
+        var parameters: [String: Any] = [
+            "status": status,
+            "source": source,
+            "college": analyticsCollegeName(college),
+            "day_offset": AnalyticsService.dayOffsetFromToday(for: selectedDay),
+            "disp_mode": displayMode == .day ? "day" : "week",
+            "dual_college": showBothCollege
+        ]
+
+        if let error {
+            parameters["error_type"] = AnalyticsService.errorTypeName(error)
+        }
+
+        AnalyticsService.logEvent("schedule_import", parameters: parameters)
+    }
+
     var body: some View {
         HStack(spacing: 16) {
             Text(selectedDay.localeMonth())
@@ -285,16 +329,47 @@ struct ScheduleViewTitle: View {
         }
 
         Button("添加自定义日程", systemImage: "plus") {
+            AnalyticsService.logEvent(
+                "custom_schedule_editor",
+                parameters: [
+                    "status": "opened",
+                    "from": "schedule_toolbar"
+                ]
+            )
             showCustomScheduleSheet = true
         }
     }
 
     private func showImportAlert(_ error: ImportError) {
+        let result: String
+        switch error {
+        case .invalidSemester:
+            result = "invalid_semester"
+        case .internalError:
+            result = "internal_error"
+        case .invalidAccount:
+            result = "invalid_account"
+        case .sessionExpired:
+            result = "session_expired"
+        case .todo:
+            result = "not_implemented"
+        }
+
+        AnalyticsService.logEvent(
+            "schedule_import",
+            parameters: [
+                "status": result,
+                "college": analyticsCollegeName(college),
+                "day_offset": AnalyticsService.dayOffsetFromToday(for: selectedDay),
+                "disp_mode": displayMode == .day ? "day" : "week"
+            ]
+        )
         alertError = error
         showAlert.toggle()
     }
 
     private func importReviewSchedule() {
+        logImportStarted(source: "review_sample")
         do {
             let semester = try Eloquent.getSemester(college: college, date: selectedDay)
 
@@ -309,16 +384,19 @@ struct ScheduleViewTitle: View {
                     try await Eloquent.insertSchedules(semester: semester, college: college, schedules: schedules, deleteExisting: true)
                     WidgetCenter.shared.reloadAllTimelines()
                     progressor.progress = Progress(description: "导入日程完成", value: 1)
+                    logImportFinished(source: "review_sample", status: "success")
                 } else {
                     showImportAlert(.invalidSemester)
                 }
             }
         } catch {
             print(error)
+            logImportFinished(source: "review_sample", status: "setup_failed", error: error)
         }
     }
 
     private func importSJTUSchedule() {
+        logImportStarted(source: "sjtu_openapi")
         guard let account = jAccount else {
             showImportAlert(.invalidAccount)
             return
@@ -337,8 +415,10 @@ struct ScheduleViewTitle: View {
                         try await Eloquent.insertSchedules(semester: semester, college: .sjtu, schedules: schedules, deleteExisting: true)
                         WidgetCenter.shared.reloadAllTimelines()
                         progressor.progress = Progress(description: "导入日程完成", value: 1)
+                        logImportFinished(source: "sjtu_openapi", status: "success")
                     } catch {
                         progressor.progress = Progress(description: "导入日程失败", value: -1)
+                        logImportFinished(source: "sjtu_openapi", status: "failed", error: error)
                     }
                 }
             } else {
@@ -350,6 +430,7 @@ struct ScheduleViewTitle: View {
     }
 
     private func importSJTUGSchedule() {
+        logImportStarted(source: "sjtug_openapi")
         guard let account = jAccount else {
             showImportAlert(.invalidAccount)
             return
@@ -370,9 +451,11 @@ struct ScheduleViewTitle: View {
                         try await Eloquent.insertSchedules(semester: semester, college: .sjtug, schedules: schedules, deleteExisting: true)
                         WidgetCenter.shared.reloadAllTimelines()
                         progressor.progress = Progress(description: "导入日程完成", value: 1)
+                        logImportFinished(source: "sjtug_openapi", status: "success")
                     } catch {
                         print(error)
                         progressor.progress = Progress(description: "导入日程失败", value: -1)
+                        logImportFinished(source: "sjtug_openapi", status: "failed", error: error)
                     }
                 }
             } else {
@@ -384,6 +467,7 @@ struct ScheduleViewTitle: View {
     }
 
     private func importSHSMUSchedule() {
+        logImportStarted(source: "shsmu_openapi")
         guard let account = shsmuAccount else {
             showImportAlert(.invalidAccount)
             return
@@ -418,9 +502,11 @@ struct ScheduleViewTitle: View {
                         try await Eloquent.insertSchedules(semester: semester, college: college, schedules: schedules, deleteExisting: true)
                         WidgetCenter.shared.reloadAllTimelines()
                         progressor.progress = Progress(description: "导入日程完成", value: 1)
+                        logImportFinished(source: "shsmu_openapi", status: "success")
                     } catch {
                         print(error)
                         progressor.progress = Progress(description: "导入日程失败", value: -1)
+                        logImportFinished(source: "shsmu_openapi", status: "failed", error: error)
                     }
                 }
             } else {
@@ -432,6 +518,7 @@ struct ScheduleViewTitle: View {
     }
 
     private func importJointSchedule() {
+        logImportStarted(source: "joint_openapi")
         guard let account = jAccount else {
             showImportAlert(.invalidAccount)
             return
@@ -465,6 +552,7 @@ struct ScheduleViewTitle: View {
                     try await Eloquent.insertSchedules(semester: jointSemester, college: college, schedules: schedules, deleteExisting: true)
                     WidgetCenter.shared.reloadAllTimelines()
                     progressor.progress = Progress(description: "导入日程完成", value: 1)
+                    logImportFinished(source: "joint_openapi", status: "success")
                 } catch APIError.runtimeError {
                     progressor.progress = Progress(description: "当前日期不属于任何有效学期", value: -1)
                     try? await Task.sleep(for: .seconds(2))
@@ -472,6 +560,7 @@ struct ScheduleViewTitle: View {
                 } catch {
                     print(error)
                     progressor.progress = Progress(description: "导入日程失败", value: -1)
+                    logImportFinished(source: "joint_openapi", status: "failed", error: error)
                 }
             }
         } catch {
@@ -2546,6 +2635,22 @@ struct ScheduleView: View {
                     }
             }
         }
+        .analyticsScreen(
+            "schedule_home",
+            screenClass: "ScheduleView",
+            parameters: [
+                "disp_mode": displayMode == .day ? "day" : "week",
+                "college": {
+                    switch collegeId {
+                    case .sjtu: return "sjtu"
+                    case .sjtug: return "sjtug"
+                    case .joint: return "joint"
+                    case .shsmu: return "shsmu"
+                    }
+                }(),
+                "dual_college": showBothCollege
+            ]
+        )
         .sensoryFeedback(.selection, trigger: selectedDay)
         .animation(.easeInOut(duration: 0.2), value: displayMode)
         .task(id: backgroundImage?.path) {
@@ -2560,6 +2665,13 @@ struct ScheduleView: View {
             isLandscape = newValue
         }
         .onChange(of: selectedDay) {
+            AnalyticsService.logEvent(
+                "schedule_day_selected",
+                parameters: [
+                    "day_offset": AnalyticsService.dayOffsetFromToday(for: selectedDay),
+                    "disp_mode": displayMode == .day ? "day" : "week"
+                ]
+            )
             interactionCache.overlayScrollReferenceOffsetY = nil
             currentVerticalScrollPhase = .idle
             if displayMode == .day {
@@ -2575,8 +2687,41 @@ struct ScheduleView: View {
             }
         }
         .onChange(of: displayMode) {
+            AnalyticsService.logEvent(
+                "schedule_mode_changed",
+                parameters: [
+                    "disp_mode": displayMode == .day ? "day" : "week",
+                    "day_offset": AnalyticsService.dayOffsetFromToday(for: selectedDay)
+                ]
+            )
             syncBackgroundParallaxMetricsToCurrentContext()
             resetWeekLabelOverlayTracking()
+        }
+        .onChange(of: activeCustomSchedule) {
+            guard activeCustomSchedule != nil else {
+                return
+            }
+
+            AnalyticsService.logEvent(
+                "custom_schedule_editor",
+                parameters: [
+                    "status": "opened",
+                    "from": "schedule_selection"
+                ]
+            )
+        }
+        .onChange(of: selectedSchedule) {
+            guard selectedSchedule != nil else {
+                return
+            }
+
+            AnalyticsService.logEvent(
+                "schedule_detail_opened",
+                parameters: [
+                    "disp_mode": displayMode == .day ? "day" : "week",
+                    "day_offset": AnalyticsService.dayOffsetFromToday(for: selectedDay)
+                ]
+            )
         }
         .onChange(of: autoHideWeekLabelOverlay) {
             resetWeekLabelOverlayTracking()

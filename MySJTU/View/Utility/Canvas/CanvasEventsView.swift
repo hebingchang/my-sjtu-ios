@@ -84,6 +84,14 @@ struct CanvasEventsView: View {
             }
         }
         .navigationTitle("待办事项")
+        .analyticsScreen(
+            "canvas_events",
+            screenClass: "CanvasEventsView",
+            parameters: [
+                "assignment_count": assignments.count,
+                "has_token": canvasToken != nil
+            ]
+        )
         .animation(.easeInOut, value: isLoading)
         .task {
             await loadAssignments()
@@ -197,6 +205,12 @@ struct CanvasEventsView: View {
 
         guard let token = canvasToken else {
             loadErrorMessage = "Canvas 令牌不可用，请在账户设置中重新启用。"
+            AnalyticsService.logEvent(
+                "canvas_events_load",
+                parameters: [
+                    "status": "no_token"
+                ]
+            )
             return
         }
 
@@ -214,18 +228,51 @@ struct CanvasEventsView: View {
 
             guard !assignmentIDs.isEmpty else {
                 assignments = []
+                AnalyticsService.logEvent(
+                    "canvas_events_load",
+                    parameters: [
+                        "status": "success",
+                        "assignment_count": 0
+                    ]
+                )
                 return
             }
 
             assignments = try await api.getAssignments(assignmentIds: assignmentIDs)
+            AnalyticsService.logEvent(
+                "canvas_events_load",
+                parameters: [
+                    "status": "success",
+                    "assignment_count": assignments.count
+                ]
+            )
         } catch APIError.sessionExpired {
             loadErrorMessage = "Canvas 令牌可能已失效，请在账户设置中重新启用。"
             showTokenExpiredAlert = true
+            AnalyticsService.logEvent(
+                "canvas_events_load",
+                parameters: [
+                    "status": "token_expired"
+                ]
+            )
         } catch ResponseCodeInterceptor.ResponseCodeError.invalidResponseCode {
             loadErrorMessage = "Canvas 令牌可能已失效，请在账户设置中重新启用。"
             showTokenExpiredAlert = true
+            AnalyticsService.logEvent(
+                "canvas_events_load",
+                parameters: [
+                    "status": "token_expired"
+                ]
+            )
         } catch {
             loadErrorMessage = "无法加载待办事项列表，请稍后重试。"
+            AnalyticsService.logEvent(
+                "canvas_events_load",
+                parameters: [
+                    "status": "failed",
+                    "error_type": AnalyticsService.errorTypeName(error)
+                ]
+            )
         }
     }
 }
